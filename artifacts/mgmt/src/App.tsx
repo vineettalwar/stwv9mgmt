@@ -3,7 +3,7 @@ import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wo
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ClerkProvider, RedirectToSignIn, useAuth } from "@clerk/react";
+import { ClerkProvider, RedirectToSignIn, useAuth, AuthenticateWithRedirectCallback } from "@clerk/react";
 import { setAuthTokenGetter, useGetMe } from "@workspace/api-client-react";
 
 import { Layout } from "@/components/layout/Layout";
@@ -138,7 +138,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/sign-in" component={SignInPage} />
+      <Route path="/sign-in/sso-callback" component={() => <AuthenticateWithRedirectCallback />} />
       <Route path="/sign-up" component={SignUpPage} />
+      <Route path="/sign-up/sso-callback" component={() => <AuthenticateWithRedirectCallback />} />
       <Route path="/" component={SmartRedirect} />
       <Route path="/dashboard" component={() => <PrivateRoute component={Dashboard} allowedRoles={STAFF_ROLES} />} />
       <Route path="/companies" component={() => <PrivateRoute component={Companies} allowedRoles={STAFF_ROLES} />} />
