@@ -506,20 +506,22 @@ router.post("/offers/:id/convert-to-contract", requireAuth, loadDbUser, async (r
       createdBy: user.id,
     }).returning();
     contract = inserted;
-    await tx.update(offersTable).set({ status: "accepted", updatedAt: new Date() }).where(eq(offersTable.id, id));
-    await logAuditTx(tx, {
-      actorId: user.id,
-      actorRole: user.role,
-      actorEmail: user.email,
-      actorName: snapshotActorName(user),
-      action: "accepted",
-      entityType: "offer",
-      entityId: id,
-      entityLabel: offer.offerNumber,
-      oldValue: { status: offer.status },
-      newValue: { status: "accepted" },
-      projectId: offer.projectId ?? null,
-    });
+    if (offer.status !== "accepted") {
+      await tx.update(offersTable).set({ status: "accepted", updatedAt: new Date() }).where(eq(offersTable.id, id));
+      await logAuditTx(tx, {
+        actorId: user.id,
+        actorRole: user.role,
+        actorEmail: user.email,
+        actorName: snapshotActorName(user),
+        action: "accepted",
+        entityType: "offer",
+        entityId: id,
+        entityLabel: offer.offerNumber,
+        oldValue: { status: offer.status },
+        newValue: { status: "accepted" },
+        projectId: offer.projectId ?? null,
+      });
+    }
   });
 
   res.status(201).json(contract);

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { ChevronDown, ChevronRight, ShieldAlert } from "lucide-react";
 
-const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
+const API_BASE = "/api";
 
 interface AuditLogActor {
   id: number;
