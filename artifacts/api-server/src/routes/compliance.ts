@@ -3,6 +3,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { db, complianceChecklistsTable, usersTable } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
+import { logAudit } from "../lib/auditLogger";
 
 const router: IRouter = Router();
 
@@ -141,6 +142,9 @@ router.patch("/compliance/:id", requireAuth, loadDbUser, async (req, res): Promi
   const parsed = Body.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
+  const [existing] = await db.select().from(complianceChecklistsTable).where(eq(complianceChecklistsTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+
   const updateData: Record<string, unknown> = { ...parsed.data, updatedAt: new Date() };
   if (parsed.data.status === "filed" && !parsed.data.filedAt) {
     updateData.filedAt = new Date();
@@ -155,6 +159,20 @@ router.patch("/compliance/:id", requireAuth, loadDbUser, async (req, res): Promi
     .where(eq(complianceChecklistsTable.id, id))
     .returning();
   if (!item) { res.status(404).json({ error: "Not found" }); return; }
+
+  if (parsed.data.status && parsed.data.status !== existing.status) {
+    await logAudit({
+      actorId: user.id,
+      actorRole: user.role,
+      action: parsed.data.status === "filed" ? "filed" : "status_changed",
+      entityType: "compliance",
+      entityId: id,
+      entityLabel: existing.itemLabel,
+      oldValue: { status: existing.status },
+      newValue: { status: parsed.data.status },
+    });
+  }
+
   const full = await getChecklistWithUser(item.id);
   res.json(full);
 });

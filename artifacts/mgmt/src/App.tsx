@@ -30,6 +30,7 @@ import DocumentCentre from "@/pages/document-centre";
 import CommunicationHub from "@/pages/communication-hub";
 import Compliance from "@/pages/compliance";
 import Pipeline from "@/pages/pipeline";
+import AuditLog from "@/pages/audit-log";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -167,6 +168,7 @@ function Router() {
       <Route path="/communication-hub" component={() => <PrivateRoute component={CommunicationHub} allowedRoles={ALL_ROLES} />} />
       <Route path="/communication-hub/:id" component={() => <PrivateRoute component={CommunicationHub} allowedRoles={ALL_ROLES} />} />
       <Route path="/compliance" component={() => <PrivateRoute component={Compliance} allowedRoles={["admin", "germany_accountant", "india_accountant"] as UserRole[]} />} />
+      <Route path="/audit-log" component={() => <PrivateRoute component={AuditLog} allowedRoles={ADMIN_ONLY} />} />
       <Route path="/settings" component={() => <PrivateRoute component={Settings} allowedRoles={ALL_ROLES} />} />
       <Route component={NotFound} />
     </Switch>

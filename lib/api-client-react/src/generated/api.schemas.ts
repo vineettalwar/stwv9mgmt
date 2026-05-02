@@ -859,6 +859,45 @@ export interface UpdateInvoiceBody {
   lineItems?: CreateInvoiceLineItemBody[];
 }
 
+export interface AuditLogActor {
+  id?: number;
+  email?: string;
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+}
+
+/**
+ * @nullable
+ */
+export type AuditLogOldValue = { [key: string]: unknown } | null;
+
+/**
+ * @nullable
+ */
+export type AuditLogNewValue = { [key: string]: unknown } | null;
+
+export interface AuditLog {
+  id: number;
+  createdAt: string;
+  /** @nullable */
+  actorId?: number | null;
+  actorRole: string;
+  action: string;
+  entityType: string;
+  entityId: number;
+  /** @nullable */
+  entityLabel?: string | null;
+  /** @nullable */
+  oldValue?: AuditLogOldValue;
+  /** @nullable */
+  newValue?: AuditLogNewValue;
+  /** @nullable */
+  projectId?: number | null;
+  actor?: AuditLogActor | null;
+}
+
 export type GetProjectBillingSummaryParams = {
   /**
    * YYYY-MM format, defaults to current month
@@ -905,4 +944,15 @@ export type ListComplianceParams = {
    */
   regime?: string;
   year?: number;
+};
+
+export type ListAuditLogsParams = {
+  entity_type?: string;
+  entity_id?: number;
+  actor_id?: number;
+  action?: string;
+  date_from?: string;
+  date_to?: string;
+  limit?: number;
+  offset?: number;
 };

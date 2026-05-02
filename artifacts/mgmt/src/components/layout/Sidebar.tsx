@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Shield,
   GitCommitHorizontal,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClerk } from "@clerk/react";
@@ -129,6 +130,13 @@ const navigation: NavItem[] = [
     icon: Shield,
     testId: "nav-compliance",
     allowedRoles: ["admin", "germany_accountant", "india_accountant"],
+  },
+  {
+    name: "Audit Log",
+    href: "/audit-log",
+    icon: ScrollText,
+    testId: "nav-audit-log",
+    allowedRoles: ["admin"],
   },
   {
     name: "My Portal",

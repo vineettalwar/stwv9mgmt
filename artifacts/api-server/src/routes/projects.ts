@@ -10,6 +10,7 @@ import {
   timeEntriesTable,
 } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
+import { logAudit } from "../lib/auditLogger";
 
 const router: IRouter = Router();
 
@@ -157,12 +158,31 @@ router.patch("/projects/:id", requireAuth, loadDbUser, async (req, res): Promise
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const parsed = UpdateProjectBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+
+  const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
+
   const [project] = await db
     .update(projectsTable)
     .set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(projectsTable.id, id))
     .returning();
   if (!project) { res.status(404).json({ error: "Project not found" }); return; }
+
+  if (parsed.data.status && parsed.data.status !== existing.status) {
+    await logAudit({
+      actorId: user.id,
+      actorRole: user.role,
+      action: "status_changed",
+      entityType: "project",
+      entityId: id,
+      entityLabel: existing.name,
+      oldValue: { status: existing.status },
+      newValue: { status: parsed.data.status },
+      projectId: id,
+    });
+  }
+
   const full = await getProjectWithDetails(project.id);
   res.json(full);
 });

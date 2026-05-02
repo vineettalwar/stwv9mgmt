@@ -45,6 +45,7 @@ import {
   Clock,
   BarChart2,
   Flag,
+  Activity,
 } from "lucide-react";
 import {
   Dialog,
@@ -71,6 +72,45 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useQuery } from "@tanstack/react-query";
+
+const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
+
+interface AuditLogEntry {
+  id: number;
+  createdAt: string;
+  actorId: number | null;
+  actorRole: string;
+  action: string;
+  entityType: string;
+  entityId: number;
+  entityLabel: string | null;
+  oldValue: Record<string, unknown> | null;
+  newValue: Record<string, unknown> | null;
+  projectId: number | null;
+  actor: { id: number; email: string; firstName?: string | null; lastName?: string | null } | null;
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  status_changed: "Status Changed",
+  signed: "Signed",
+  filed: "Filed",
+  role_changed: "Role Changed",
+};
+
+const ENTITY_TYPE_COLORS: Record<string, string> = {
+  invoice: "bg-slate-100 text-slate-700",
+  contract: "bg-indigo-100 text-indigo-700",
+  offer: "bg-sky-100 text-sky-700",
+  compliance: "bg-purple-100 text-purple-700",
+  project: "bg-emerald-100 text-emerald-700",
+};
+
+function actorDisplayName(entry: AuditLogEntry): string {
+  if (!entry.actor) return entry.actorRole.replace(/_/g, " ");
+  const name = [entry.actor.firstName, entry.actor.lastName].filter(Boolean).join(" ");
+  return name || entry.actor.email;
+}
 
 const TYPE_LABELS: Record<string, string> = {
   one_time: "One-Time",
@@ -91,7 +131,7 @@ const DELIVERABLE_STATUS_COLUMNS = [
   { key: "done", label: "Done", icon: CheckCircle2, color: "text-emerald-500" },
 ] as const;
 
-type Tab = "overview" | "deliverables" | "milestones" | "time" | "billing";
+type Tab = "overview" | "deliverables" | "milestones" | "time" | "billing" | "activity";
 
 function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
@@ -608,6 +648,65 @@ function BillingTab({ projectId, projectType }: { projectId: number; projectType
   );
 }
 
+// ─── Activity Tab ─────────────────────────────────────────────────────────────
+
+function ActivityTab({ projectId }: { projectId: number }) {
+  const { data: entries, isLoading } = useQuery<AuditLogEntry[]>({
+    queryKey: ["project-activity", projectId],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/projects/${projectId}/activity`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load activity");
+      return res.json();
+    },
+  });
+
+  if (isLoading) return <Skeleton className="h-40 w-full" />;
+
+  if (!entries || entries.length === 0) {
+    return (
+      <div className="text-center py-12 text-sm text-slate-400">
+        No activity recorded for this project yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {entries.map(entry => {
+        const oldStatus = (entry.oldValue as { status?: string } | null)?.status;
+        const newStatus = (entry.newValue as { status?: string } | null)?.status;
+        const entityColor = ENTITY_TYPE_COLORS[entry.entityType] ?? "bg-slate-100 text-slate-700";
+
+        return (
+          <div key={entry.id} className="flex items-start gap-3 p-3 border border-slate-100 rounded-md bg-white text-sm">
+            <Activity className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-medium text-slate-900">{actorDisplayName(entry)}</span>
+                <span className="text-slate-500">{ACTION_LABELS[entry.action] ?? entry.action}</span>
+                <Badge className={`text-xs ${entityColor}`}>
+                  {entry.entityType} {entry.entityLabel ? `· ${entry.entityLabel}` : `#${entry.entityId}`}
+                </Badge>
+                {oldStatus && newStatus && (
+                  <span className="text-slate-400 text-xs">
+                    {oldStatus} → {newStatus}
+                  </span>
+                )}
+              </div>
+            </div>
+            <span className="text-xs text-slate-400 flex-shrink-0 whitespace-nowrap">
+              {new Date(entry.createdAt).toLocaleString("en-GB", {
+                day: "2-digit", month: "short",
+                hour: "2-digit", minute: "2-digit",
+              })}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
 function OverviewTab({ project, canEdit }: { project: Project; canEdit: boolean }) {
@@ -881,6 +980,7 @@ export default function ProjectDetail() {
           {showBilling && (
             <TabButton active={activeTab === "billing"} onClick={() => setActiveTab("billing")}>Billing Cycle</TabButton>
           )}
+          <TabButton active={activeTab === "activity"} onClick={() => setActiveTab("activity")}>Activity</TabButton>
         </div>
       </div>
 
@@ -890,6 +990,7 @@ export default function ProjectDetail() {
         {activeTab === "milestones" && <MilestonesTab projectId={projectId} canEdit={canEdit} />}
         {activeTab === "time" && <TimeTab projectId={projectId} />}
         {activeTab === "billing" && <BillingTab projectId={projectId} projectType={project.type} />}
+        {activeTab === "activity" && <ActivityTab projectId={projectId} />}
       </div>
     </div>
   );

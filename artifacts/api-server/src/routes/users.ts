@@ -17,6 +17,7 @@ import {
   GetUserCompaniesResponse,
 } from "@workspace/api-zod";
 import { requireAuth, requireAdmin } from "../middlewares/requireRole";
+import { logAudit } from "../lib/auditLogger";
 import { getAuth, clerkClient } from "@clerk/express";
 
 const router: IRouter = Router();
@@ -172,6 +173,9 @@ router.patch("/users/:id", requireAuth, requireAdmin, async (req, res): Promise<
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
   const parsed = SafeUpdateUserBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+
+  const [existing] = await db.select().from(usersTable).where(eq(usersTable.id, params.data.id));
+
   const [user] = await db.update(usersTable)
     .set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(usersTable.id, params.data.id))
@@ -188,6 +192,23 @@ router.patch("/users/:id", requireAuth, requireAdmin, async (req, res): Promise<
     } catch {
       // Non-fatal: DB is the primary source of truth; Clerk sync is best-effort
     }
+  }
+
+  if (existing && parsed.data.role && parsed.data.role !== existing.role) {
+    const auth = req.auth as { userId?: string } | undefined;
+    const adminUser = auth?.userId
+      ? await db.select().from(usersTable).where(eq(usersTable.clerkUserId, auth.userId)).then(r => r[0])
+      : null;
+    await logAudit({
+      actorId: adminUser?.id ?? null,
+      actorRole: adminUser?.role ?? "admin",
+      action: "role_changed",
+      entityType: "user",
+      entityId: user.id,
+      entityLabel: user.email,
+      oldValue: { role: existing.role },
+      newValue: { role: parsed.data.role },
+    });
   }
 
   const full = await getUserWithCompanies(user.id);

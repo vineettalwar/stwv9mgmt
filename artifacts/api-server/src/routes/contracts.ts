@@ -11,6 +11,7 @@ import {
   projectsTable,
 } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
+import { logAudit } from "../lib/auditLogger";
 import { safeLogoFetch } from "../lib/safeLogoFetch";
 import { pdfToBuffer } from "../lib/pdfBuffer";
 import { sendDocumentEmail } from "../lib/emailService";
@@ -120,6 +121,9 @@ router.patch("/contracts/:id", requireAuth, loadDbUser, async (req, res): Promis
   const parsed = Body.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
+  const [existing] = await db.select().from(contractsTable).where(eq(contractsTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+
   const updates: Record<string, unknown> = { ...parsed.data, updatedAt: new Date() };
   if (parsed.data.status === "signed") {
     updates.signedAt = new Date();
@@ -127,6 +131,20 @@ router.patch("/contracts/:id", requireAuth, loadDbUser, async (req, res): Promis
 
   const [contract] = await db.update(contractsTable).set(updates).where(eq(contractsTable.id, id)).returning();
   if (!contract) { res.status(404).json({ error: "Not found" }); return; }
+
+  if (parsed.data.status && parsed.data.status !== existing.status) {
+    await logAudit({
+      actorId: user.id,
+      actorRole: user.role,
+      action: parsed.data.status === "signed" ? "signed" : "status_changed",
+      entityType: "contract",
+      entityId: id,
+      entityLabel: existing.contractNumber,
+      oldValue: { status: existing.status },
+      newValue: { status: parsed.data.status },
+      projectId: existing.projectId ?? null,
+    });
+  }
 
   const full = await getContractWithDetails(contract.id);
   res.json(full);

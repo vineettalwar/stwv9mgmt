@@ -39,6 +39,8 @@ tags:
     description: User notifications
   - name: compliance
     description: Compliance checklists for Germany and India
+  - name: audit_logs
+    description: Audit trail for financially significant actions
 paths:
   /healthz:
     get:
@@ -1860,6 +1862,69 @@ paths:
                 items:
                   $ref: "#/components/schemas/ComplianceItem"
 
+  # ───── AUDIT LOGS ─────
+  /audit-logs:
+    get:
+      operationId: listAuditLogs
+      tags: [audit_logs]
+      summary: List audit log entries (admin only)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: entity_type
+          schema: { type: string }
+        - in: query
+          name: entity_id
+          schema: { type: integer }
+        - in: query
+          name: actor_id
+          schema: { type: integer }
+        - in: query
+          name: action
+          schema: { type: string }
+        - in: query
+          name: date_from
+          schema: { type: string }
+        - in: query
+          name: date_to
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer }
+        - in: query
+          name: offset
+          schema: { type: integer }
+      responses:
+        "200":
+          description: List of audit log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditLog"
+
+  /projects/{id}/activity:
+    get:
+      operationId: getProjectActivity
+      tags: [audit_logs]
+      summary: Get project-scoped activity feed (last 50 events)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Project activity entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditLog"
+
   # ───── ADMIN DASHBOARD ─────
   /dashboard/admin-stats:
     get:
@@ -3492,4 +3557,56 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CreateInvoiceLineItemBody"
+
+    AuditLogActor:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+
+    AuditLog:
+      type: object
+      required:
+        - id
+        - createdAt
+        - actorRole
+        - action
+        - entityType
+        - entityId
+      properties:
+        id:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        actorId:
+          type: ["integer", "null"]
+        actorRole:
+          type: string
+        action:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: integer
+        entityLabel:
+          type: ["string", "null"]
+        oldValue:
+          type: ["object", "null"]
+          additionalProperties: true
+        newValue:
+          type: ["object", "null"]
+          additionalProperties: true
+        projectId:
+          type: ["integer", "null"]
+        actor:
+          oneOf:
+            - $ref: "#/components/schemas/AuditLogActor"
+            - type: "null"
 

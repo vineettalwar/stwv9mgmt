@@ -2120,6 +2120,81 @@ export const SeedComplianceBody = zod.object({
 });
 
 /**
+ * @summary List audit log entries (admin only)
+ */
+export const ListAuditLogsQueryParams = zod.object({
+  entity_type: zod.coerce.string().optional(),
+  entity_id: zod.coerce.number().optional(),
+  actor_id: zod.coerce.number().optional(),
+  action: zod.coerce.string().optional(),
+  date_from: zod.coerce.string().optional(),
+  date_to: zod.coerce.string().optional(),
+  limit: zod.coerce.number().optional(),
+  offset: zod.coerce.number().optional(),
+});
+
+export const ListAuditLogsResponseItem = zod.object({
+  id: zod.number(),
+  createdAt: zod.coerce.date(),
+  actorId: zod.number().nullish(),
+  actorRole: zod.string(),
+  action: zod.string(),
+  entityType: zod.string(),
+  entityId: zod.number(),
+  entityLabel: zod.string().nullish(),
+  oldValue: zod.record(zod.string(), zod.unknown()).nullish(),
+  newValue: zod.record(zod.string(), zod.unknown()).nullish(),
+  projectId: zod.number().nullish(),
+  actor: zod
+    .union([
+      zod.object({
+        id: zod.number().optional(),
+        email: zod.string().optional(),
+        firstName: zod.string().nullish(),
+        lastName: zod.string().nullish(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+});
+export const ListAuditLogsResponse = zod.array(ListAuditLogsResponseItem);
+
+/**
+ * @summary Get project-scoped activity feed (last 50 events)
+ */
+export const GetProjectActivityParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetProjectActivityResponseItem = zod.object({
+  id: zod.number(),
+  createdAt: zod.coerce.date(),
+  actorId: zod.number().nullish(),
+  actorRole: zod.string(),
+  action: zod.string(),
+  entityType: zod.string(),
+  entityId: zod.number(),
+  entityLabel: zod.string().nullish(),
+  oldValue: zod.record(zod.string(), zod.unknown()).nullish(),
+  newValue: zod.record(zod.string(), zod.unknown()).nullish(),
+  projectId: zod.number().nullish(),
+  actor: zod
+    .union([
+      zod.object({
+        id: zod.number().optional(),
+        email: zod.string().optional(),
+        firstName: zod.string().nullish(),
+        lastName: zod.string().nullish(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+});
+export const GetProjectActivityResponse = zod.array(
+  GetProjectActivityResponseItem,
+);
+
+/**
  * @summary Get admin/accountant summary stats (invoices, hours, offers, compliance)
  */
 export const GetAdminDashboardStatsResponse = zod.object({

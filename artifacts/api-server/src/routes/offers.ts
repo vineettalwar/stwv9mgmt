@@ -12,6 +12,7 @@ import {
   contractsTable,
 } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
+import { logAudit } from "../lib/auditLogger";
 import { safeLogoFetch } from "../lib/safeLogoFetch";
 import { pdfToBuffer } from "../lib/pdfBuffer";
 import { sendDocumentEmail } from "../lib/emailService";
@@ -200,6 +201,21 @@ router.patch("/offers/:id", requireAuth, loadDbUser, async (req, res): Promise<v
   }
 
   await db.update(offersTable).set({ ...offerData, ...totals, updatedAt: new Date() }).where(eq(offersTable.id, id));
+
+  if (offerData.status && offerData.status !== existing.status) {
+    await logAudit({
+      actorId: user.id,
+      actorRole: user.role,
+      action: "status_changed",
+      entityType: "offer",
+      entityId: id,
+      entityLabel: existing.offerNumber,
+      oldValue: { status: existing.status },
+      newValue: { status: offerData.status },
+      projectId: existing.projectId ?? null,
+    });
+  }
+
   const full = await getOfferWithDetails(id);
   res.json(full);
 });

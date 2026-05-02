@@ -16,6 +16,7 @@ import messagesRouter from "./messages";
 import notificationsRouter from "./notifications";
 import complianceRouter from "./compliance";
 import adminDashboardRouter from "./adminDashboard";
+import auditLogsRouter from "./auditLogs";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use(invoicesRouter);
 router.use(messagesRouter);
 router.use(notificationsRouter);
 router.use(complianceRouter);
+router.use(auditLogsRouter);
 
 export default router;
