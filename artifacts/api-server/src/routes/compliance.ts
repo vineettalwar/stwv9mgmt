@@ -145,17 +145,27 @@ router.patch("/compliance/:id", requireAuth, loadDbUser, async (req, res): Promi
   const [existing] = await db.select().from(complianceChecklistsTable).where(eq(complianceChecklistsTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
 
-  const updateData: Record<string, unknown> = { ...parsed.data, updatedAt: new Date() };
+  // Compute the final filedAt as a Date (Drizzle needs Date, not string)
+  let resolvedFiledAt: Date | null | undefined;
   if (parsed.data.status === "filed" && !parsed.data.filedAt) {
-    updateData.filedAt = new Date();
+    resolvedFiledAt = new Date();
+  } else if (parsed.data.filedAt === null) {
+    resolvedFiledAt = null;
+  } else if (parsed.data.filedAt) {
+    resolvedFiledAt = new Date(parsed.data.filedAt);
   }
-  if (parsed.data.filedAt === null) {
-    updateData.filedAt = null;
-  }
+
+  // Exclude filedAt from the spread to avoid string→timestamp mismatch; add it typed as Date
+  const { filedAt: _filedAt, ...restData } = parsed.data;
+  const setPayload = {
+    ...restData,
+    updatedAt: new Date(),
+    ...(resolvedFiledAt !== undefined ? { filedAt: resolvedFiledAt } : {}),
+  };
 
   const [item] = await db
     .update(complianceChecklistsTable)
-    .set(updateData as Parameters<typeof db.update>[0])
+    .set(setPayload)
     .where(eq(complianceChecklistsTable.id, id))
     .returning();
   if (!item) { res.status(404).json({ error: "Not found" }); return; }
@@ -201,7 +211,7 @@ router.post("/compliance/seed", requireAuth, loadDbUser, async (req, res): Promi
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { companyId, regime, year } = parsed.data;
 
-  const items: Parameters<typeof db.insert>[0]["values"] = [];
+  const items: (typeof complianceChecklistsTable.$inferInsert)[] = [];
 
   if (regime === "germany") {
     // Quarterly VAT returns

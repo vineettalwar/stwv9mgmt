@@ -10,7 +10,7 @@ import {
   timeEntriesTable,
 } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
-import { logAudit } from "../lib/auditLogger";
+import { logAudit, logAuditTx } from "../lib/auditLogger";
 
 const router: IRouter = Router();
 
@@ -117,22 +117,26 @@ router.post("/projects", requireAuth, loadDbUser, async (req, res): Promise<void
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [project] = await db
-    .insert(projectsTable)
-    .values(parsed.data)
-    .returning();
-  await logAudit({
-    actorId: user.id,
-    actorRole: user.role,
-    action: "status_changed",
-    entityType: "project",
-    entityId: project.id,
-    entityLabel: project.name,
-    oldValue: null,
-    newValue: { status: project.status, name: project.name },
-    projectId: project.id,
+  let project: { id: number; name: string; status: string };
+  await db.transaction(async (tx) => {
+    const [inserted] = await tx
+      .insert(projectsTable)
+      .values(parsed.data)
+      .returning();
+    project = inserted;
+    await logAuditTx(tx, {
+      actorId: user.id,
+      actorRole: user.role,
+      action: "status_changed",
+      entityType: "project",
+      entityId: inserted.id,
+      entityLabel: inserted.name,
+      oldValue: null,
+      newValue: { status: inserted.status, name: inserted.name },
+      projectId: inserted.id,
+    });
   });
-  const full = await getProjectWithDetails(project.id);
+  const full = await getProjectWithDetails(project!.id);
   res.status(201).json(full);
 });
 
@@ -206,7 +210,22 @@ router.delete("/projects/:id", requireAuth, loadDbUser, async (req, res): Promis
   }
   const id = parseInt(String(req.params.id));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
-  await db.delete(projectsTable).where(eq(projectsTable.id, id));
+  const [existing] = await db.select({ name: projectsTable.name, status: projectsTable.status })
+    .from(projectsTable).where(eq(projectsTable.id, id));
+  await db.transaction(async (tx) => {
+    await tx.delete(projectsTable).where(eq(projectsTable.id, id));
+    await logAuditTx(tx, {
+      actorId: user.id,
+      actorRole: user.role,
+      action: "status_changed",
+      entityType: "project",
+      entityId: id,
+      entityLabel: existing?.name ?? null,
+      oldValue: existing ? { status: existing.status, name: existing.name } : null,
+      newValue: { status: "deleted" },
+      projectId: id,
+    });
+  });
   res.sendStatus(204);
 });
 

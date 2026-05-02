@@ -195,7 +195,7 @@ router.patch("/users/:id", requireAuth, requireAdmin, async (req, res): Promise<
   }
 
   if (existing && parsed.data.role && parsed.data.role !== existing.role) {
-    const auth = req.auth as { userId?: string } | undefined;
+    const auth = getAuth(req);
     const adminUser = auth?.userId
       ? await db.select().from(usersTable).where(eq(usersTable.clerkUserId, auth.userId)).then(r => r[0])
       : null;
