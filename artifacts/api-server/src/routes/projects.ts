@@ -15,7 +15,7 @@ import { logAudit, logAuditTx } from "../lib/auditLogger";
 const router: IRouter = Router();
 
 const PROJECT_TYPES = ["one_time", "monthly_fixed", "amc", "internal"] as const;
-const PROJECT_STATUSES = ["active", "completed", "on_hold"] as const;
+const PROJECT_STATUSES = ["active", "completed", "on_hold", "archived"] as const;
 const BILLING_MODELS = ["hourly", "fixed", "retainer"] as const;
 
 const CreateProjectBody = z.object({
@@ -215,17 +215,22 @@ router.delete("/projects/:id", requireAuth, loadDbUser, async (req, res): Promis
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const [existing] = await db.select({ name: projectsTable.name, status: projectsTable.status })
     .from(projectsTable).where(eq(projectsTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
+  if (existing.status === "archived") { res.sendStatus(204); return; }
   await db.transaction(async (tx) => {
-    await tx.delete(projectsTable).where(eq(projectsTable.id, id));
+    await tx
+      .update(projectsTable)
+      .set({ status: "archived", archivedAt: new Date(), updatedAt: new Date() })
+      .where(eq(projectsTable.id, id));
     await logAuditTx(tx, {
       actorId: user.id,
       actorRole: user.role,
-      action: "status_changed",
+      action: "archived",
       entityType: "project",
       entityId: id,
-      entityLabel: existing?.name ?? null,
-      oldValue: existing ? { status: existing.status, name: existing.name } : null,
-      newValue: { status: "deleted" },
+      entityLabel: existing.name,
+      oldValue: { status: existing.status },
+      newValue: { status: "archived" },
       projectId: id,
     });
   });

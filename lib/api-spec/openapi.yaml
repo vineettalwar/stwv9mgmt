@@ -2246,7 +2246,7 @@ components:
           type: ["string", "null"]
         status:
           type: string
-          description: "One of: active, completed, on_hold"
+          description: "One of: active, completed, on_hold, archived"
         billingModel:
           type: string
           description: "One of: hourly, fixed, retainer"
@@ -2313,7 +2313,7 @@ components:
           type: ["string", "null"]
         status:
           type: string
-          description: "One of: active, completed, on_hold"
+          description: "One of: active, completed, on_hold, archived"
         billingModel:
           type: string
           description: "One of: hourly, fixed, retainer"

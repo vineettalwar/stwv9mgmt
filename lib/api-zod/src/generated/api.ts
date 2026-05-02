@@ -433,7 +433,7 @@ export const ListProjectsResponseItem = zod.object({
   companyId: zod.number(),
   clientId: zod.number().nullish(),
   description: zod.string().nullish(),
-  status: zod.string().describe("One of: active, completed, on_hold"),
+  status: zod.string().describe("One of: active, completed, on_hold, archived"),
   billingModel: zod.string().describe("One of: hourly, fixed, retainer"),
   fixedAllocationHours: zod.string().nullish(),
   startDate: zod.string().nullish(),
@@ -479,7 +479,7 @@ export const CreateProjectBody = zod.object({
   status: zod
     .string()
     .optional()
-    .describe("One of: active, completed, on_hold"),
+    .describe("One of: active, completed, on_hold, archived"),
   billingModel: zod.string().describe("One of: hourly, fixed, retainer"),
   fixedAllocationHours: zod.string().nullish(),
   startDate: zod.string().nullish(),
@@ -500,7 +500,7 @@ export const GetProjectResponse = zod.object({
   companyId: zod.number(),
   clientId: zod.number().nullish(),
   description: zod.string().nullish(),
-  status: zod.string().describe("One of: active, completed, on_hold"),
+  status: zod.string().describe("One of: active, completed, on_hold, archived"),
   billingModel: zod.string().describe("One of: hourly, fixed, retainer"),
   fixedAllocationHours: zod.string().nullish(),
   startDate: zod.string().nullish(),
@@ -560,7 +560,7 @@ export const UpdateProjectResponse = zod.object({
   companyId: zod.number(),
   clientId: zod.number().nullish(),
   description: zod.string().nullish(),
-  status: zod.string().describe("One of: active, completed, on_hold"),
+  status: zod.string().describe("One of: active, completed, on_hold, archived"),
   billingModel: zod.string().describe("One of: hourly, fixed, retainer"),
   fixedAllocationHours: zod.string().nullish(),
   startDate: zod.string().nullish(),

@@ -53,6 +53,7 @@ const STATUS_STYLES: Record<string, { label: string; className: string }> = {
   active: { label: "Active", className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" },
   completed: { label: "Completed", className: "bg-slate-100 text-slate-600 hover:bg-slate-100" },
   on_hold: { label: "On Hold", className: "bg-amber-100 text-amber-800 hover:bg-amber-100" },
+  archived: { label: "Archived", className: "bg-slate-200 text-slate-500 hover:bg-slate-200" },
 };
 
 const TYPE_STYLES: Record<string, string> = {
@@ -68,7 +69,7 @@ const createProjectSchema = z.object({
   companyId: z.number({ required_error: "Company is required" }),
   clientId: z.number().nullable().optional(),
   billingModel: z.enum(["hourly", "fixed", "retainer"]),
-  status: z.enum(["active", "completed", "on_hold"]).default("active"),
+  status: z.enum(["active", "completed", "on_hold", "archived"]).default("active"),
   description: z.string().nullable().optional(),
   fixedAllocationHours: z.string().nullable().optional(),
   startDate: z.string().nullable().optional(),

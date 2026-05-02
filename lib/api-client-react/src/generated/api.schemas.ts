@@ -172,7 +172,7 @@ export interface Project {
   clientId?: number | null;
   /** @nullable */
   description?: string | null;
-  /** One of: active, completed, on_hold */
+  /** One of: active, completed, on_hold, archived */
   status: string;
   /** One of: hourly, fixed, retainer */
   billingModel: string;
@@ -197,7 +197,7 @@ export interface CreateProjectBody {
   clientId?: number | null;
   /** @nullable */
   description?: string | null;
-  /** One of: active, completed, on_hold */
+  /** One of: active, completed, on_hold, archived */
   status?: string;
   /** One of: hourly, fixed, retainer */
   billingModel: string;

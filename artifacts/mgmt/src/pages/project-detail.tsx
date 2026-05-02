@@ -123,6 +123,7 @@ const STATUS_STYLES: Record<string, { label: string; className: string }> = {
   active: { label: "Active", className: "bg-emerald-100 text-emerald-800" },
   completed: { label: "Completed", className: "bg-slate-100 text-slate-600" },
   on_hold: { label: "On Hold", className: "bg-amber-100 text-amber-800" },
+  archived: { label: "Archived", className: "bg-slate-200 text-slate-500" },
 };
 
 const DELIVERABLE_STATUS_COLUMNS = [

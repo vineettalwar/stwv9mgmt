@@ -15,7 +15,8 @@ export const projectsTable = pgTable("projects", {
     onDelete: "set null",
   }),
   description: text("description"),
-  status: text("status").notNull().default("active"), // active | completed | on_hold
+  status: text("status").notNull().default("active"), // active | completed | on_hold | archived
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
   billingModel: text("billing_model").notNull().default("hourly"), // hourly | fixed | retainer
   fixedAllocationHours: text("fixed_allocation_hours"),
   startDate: text("start_date"),
