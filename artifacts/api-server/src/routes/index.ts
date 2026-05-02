@@ -9,6 +9,9 @@ import timeEntriesRouter from "./timeEntries";
 import deliverablesRouter from "./deliverables";
 import milestonesRouter from "./milestones";
 import todosRouter from "./todos";
+import offersRouter from "./offers";
+import contractsRouter from "./contracts";
+import invoicesRouter from "./invoices";
 
 const router: IRouter = Router();
 
@@ -22,5 +25,8 @@ router.use(timeEntriesRouter);
 router.use(deliverablesRouter);
 router.use(milestonesRouter);
 router.use(todosRouter);
+router.use(offersRouter);
+router.use(contractsRouter);
+router.use(invoicesRouter);
 
 export default router;

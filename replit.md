@@ -106,6 +106,19 @@ All routes require Clerk auth (Bearer token). Prefix: `/api`
 - `GET|POST /todos` — list (role-filtered) / create
 - `PATCH|DELETE /todos/:id` — update / delete todo
 
+### Offers, Contracts & Invoices (Task 3)
+- `GET|POST /offers` — list / create offers
+- `GET|PATCH|DELETE /offers/:id` — detail / update / delete
+- `POST /offers/:id/convert-to-contract` — convert accepted offer to contract
+- `GET|POST /contracts` — list / create contracts
+- `GET|PATCH|DELETE /contracts/:id` — detail / update / delete
+- `GET|POST /contract-templates` — list / create contract templates
+- `GET|PATCH|DELETE /contract-templates/:id` — detail / update / delete
+- `GET|POST /invoices` — list / create invoices (auto-calculates tax by company taxRegime)
+- `GET|PATCH|DELETE /invoices/:id` — detail / update / delete
+- `GET /invoices/export/datev` — DATEV CSV export (admin/germany_accountant only)
+- `GET /invoices/export/tally?format=xml|csv` — Tally export (admin/india_accountant only)
+
 ## Frontend Pages
 
 - `/` → redirects to `/dashboard`
@@ -123,6 +136,10 @@ All routes require Clerk auth (Bearer token). Prefix: `/api`
 - `/todos` — task list with priority, due date, toggle done; role-filtered
 - `/client-portal` — client view: their projects + deliverable status
 - `/freelancer-portal` — freelancer view: assigned projects + time log
+- `/documents` — Document Centre: unified cross-entity view of all offers, contracts, and invoices with filtering by type/company/project/client
+- `/offers` — offer builder; create/send/accept offers with line items and PDF export; offer→contract conversion
+- `/contracts` — contract management; create from offer or scratch, sign/execute, PDF export; contract templates
+- `/invoices` — multi-entity invoice management with German VAT (19%) and Indian GST (CGST+SGST/IGST/none based on intra/inter-state auto-detection); DATEV CSV export (admin/germany_accountant), Tally XML/CSV export (admin/india_accountant); recurring invoice scheduler (auto-clones every 6h)
 
 ## Auth Notes
 

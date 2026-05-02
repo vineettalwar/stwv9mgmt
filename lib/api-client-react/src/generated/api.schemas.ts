@@ -431,6 +431,269 @@ export interface UpdateTodoBody {
   completedAt?: string | null;
 }
 
+export interface OfferLineItem {
+  id: number;
+  offerId: number;
+  description: string;
+  quantity: string;
+  unitPrice: string;
+  amount: string;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface ProjectBasic {
+  id: number;
+  name: string;
+}
+
+export interface Offer {
+  id: number;
+  offerNumber: string;
+  companyId: number;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  clientId?: number | null;
+  title: string;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  validUntil?: string | null;
+  /** One of: draft, sent, accepted, rejected, expired */
+  status: string;
+  subtotal: string;
+  taxAmount: string;
+  totalAmount: string;
+  currency: string;
+  lineItems: OfferLineItem[];
+  company?: Company | null;
+  client?: UserBasic | null;
+  project?: ProjectBasic | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateOfferLineItemBody {
+  description: string;
+  quantity?: string;
+  unitPrice?: string;
+  sortOrder?: number;
+}
+
+export interface CreateOfferBody {
+  companyId: number;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  clientId?: number | null;
+  title: string;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  validUntil?: string | null;
+  currency?: string;
+  lineItems?: CreateOfferLineItemBody[];
+}
+
+export interface UpdateOfferBody {
+  title?: string;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  validUntil?: string | null;
+  status?: string;
+  currency?: string;
+  lineItems?: CreateOfferLineItemBody[];
+}
+
+export interface ConvertOfferBody {
+  /** One of: client_service, freelancer_service */
+  type?: string;
+}
+
+export interface Contract {
+  id: number;
+  contractNumber: string;
+  /** One of: client_service, freelancer_service */
+  type: string;
+  companyId: number;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  clientId?: number | null;
+  /** @nullable */
+  offerId?: number | null;
+  title: string;
+  content: string;
+  /** One of: draft, sent, signed, cancelled */
+  status: string;
+  /** @nullable */
+  signedAt?: string | null;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+  company?: Company | null;
+  client?: UserBasic | null;
+  project?: ProjectBasic | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateContractBody {
+  /** One of: client_service, freelancer_service */
+  type: string;
+  companyId: number;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  clientId?: number | null;
+  title: string;
+  content: string;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+}
+
+export interface UpdateContractBody {
+  title?: string;
+  content?: string;
+  status?: string;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+}
+
+export interface ContractTemplate {
+  id: number;
+  name: string;
+  type: string;
+  content: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateContractTemplateBody {
+  name: string;
+  type: string;
+  content: string;
+  isDefault?: boolean;
+}
+
+export interface UpdateContractTemplateBody {
+  name?: string;
+  content?: string;
+  isDefault?: boolean;
+}
+
+export interface InvoiceLineItem {
+  id: number;
+  invoiceId: number;
+  /** @nullable */
+  timeEntryId?: number | null;
+  description: string;
+  quantity: string;
+  unitPrice: string;
+  amount: string;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface Invoice {
+  id: number;
+  invoiceNumber: string;
+  companyId: number;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  clientId?: number | null;
+  title: string;
+  /** @nullable */
+  notes?: string | null;
+  issueDate: string;
+  /** @nullable */
+  dueDate?: string | null;
+  /** One of: draft, sent, paid, overdue, cancelled */
+  status: string;
+  /** One of: none, vat, cgst_sgst, igst */
+  taxType: string;
+  taxRate: string;
+  subtotal: string;
+  taxAmount: string;
+  totalAmount: string;
+  currency: string;
+  isRecurring: boolean;
+  /** @nullable */
+  recurringInterval?: string | null;
+  /** @nullable */
+  nextInvoiceDate?: string | null;
+  lineItems: InvoiceLineItem[];
+  company?: Company | null;
+  client?: UserBasic | null;
+  project?: ProjectBasic | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateInvoiceLineItemBody {
+  /** @nullable */
+  timeEntryId?: number | null;
+  description: string;
+  quantity?: string;
+  unitPrice?: string;
+  sortOrder?: number;
+}
+
+export interface CreateInvoiceBody {
+  companyId: number;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  clientId?: number | null;
+  title: string;
+  /** @nullable */
+  notes?: string | null;
+  issueDate: string;
+  /** @nullable */
+  dueDate?: string | null;
+  taxType?: string;
+  /**
+   * Indian state of the seller (for GST intra/inter-state detection)
+   * @nullable
+   */
+  sellerState?: string | null;
+  /**
+   * Indian state of the buyer (for GST intra/inter-state detection)
+   * @nullable
+   */
+  buyerState?: string | null;
+  currency?: string;
+  isRecurring?: boolean;
+  /** @nullable */
+  recurringInterval?: string | null;
+  lineItems?: CreateInvoiceLineItemBody[];
+}
+
+export interface UpdateInvoiceBody {
+  title?: string;
+  /** @nullable */
+  notes?: string | null;
+  issueDate?: string;
+  /** @nullable */
+  dueDate?: string | null;
+  status?: string;
+  isRecurring?: boolean;
+  /** @nullable */
+  recurringInterval?: string | null;
+  /** @nullable */
+  nextInvoiceDate?: string | null;
+  lineItems?: CreateInvoiceLineItemBody[];
+}
+
 export type GetProjectBillingSummaryParams = {
   /**
    * YYYY-MM format, defaults to current month
@@ -456,4 +719,16 @@ export type ListMyTimeEntriesParams = {
 export type ListTodosParams = {
   projectId?: number;
   status?: string;
+};
+
+export type ListInvoicesParams = {
+  status?: string;
+  companyId?: number;
+};
+
+export type ExportTallyParams = {
+  /**
+   * xml or csv
+   */
+  format?: string;
 };

@@ -22,6 +22,10 @@ import Projects from "@/pages/projects";
 import ProjectDetail from "@/pages/project-detail";
 import TimeTracking from "@/pages/time-tracking";
 import Todos from "@/pages/todos";
+import Offers from "@/pages/offers";
+import Contracts from "@/pages/contracts";
+import Invoices from "@/pages/invoices";
+import DocumentCentre from "@/pages/document-centre";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -147,6 +151,10 @@ function Router() {
       <Route path="/projects/:id" component={() => <PrivateRoute component={ProjectDetail} allowedRoles={ALL_ROLES} />} />
       <Route path="/time-tracking" component={() => <PrivateRoute component={TimeTracking} allowedRoles={WORKER_ROLES} />} />
       <Route path="/todos" component={() => <PrivateRoute component={Todos} allowedRoles={STAFF_ROLES} />} />
+      <Route path="/documents" component={() => <PrivateRoute component={DocumentCentre} allowedRoles={STAFF_ROLES} />} />
+      <Route path="/offers" component={() => <PrivateRoute component={Offers} allowedRoles={STAFF_ROLES} />} />
+      <Route path="/contracts" component={() => <PrivateRoute component={Contracts} allowedRoles={STAFF_ROLES} />} />
+      <Route path="/invoices" component={() => <PrivateRoute component={Invoices} allowedRoles={STAFF_ROLES} />} />
       <Route path="/client-portal" component={() => <PrivateRoute component={ClientPortal} allowedRoles={CLIENT_ONLY} />} />
       <Route path="/freelancer-portal" component={() => <PrivateRoute component={FreelancerPortal} allowedRoles={FREELANCER_ONLY} />} />
       <Route path="/settings" component={() => <PrivateRoute component={Settings} allowedRoles={ALL_ROLES} />} />

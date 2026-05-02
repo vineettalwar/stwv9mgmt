@@ -27,6 +27,12 @@ tags:
   - name: todos
     description: TODO and task management
 
+  - name: offers
+    description: Offer and proposal management
+  - name: contracts
+    description: Contract management
+  - name: invoices
+    description: Invoice management and export
 paths:
   /healthz:
     get:
@@ -998,6 +1004,438 @@ paths:
         "204":
           description: Deleted
 
+  # ───── OFFERS ─────
+  /offers:
+    get:
+      operationId: listOffers
+      tags: [offers]
+      summary: List all offers
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: List of offers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Offer"
+    post:
+      operationId: createOffer
+      tags: [offers]
+      summary: Create an offer
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOfferBody"
+      responses:
+        "201":
+          description: Created offer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Offer"
+
+  /offers/{id}:
+    get:
+      operationId: getOffer
+      tags: [offers]
+      summary: Get an offer
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Offer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Offer"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateOffer
+      tags: [offers]
+      summary: Update an offer
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOfferBody"
+      responses:
+        "200":
+          description: Updated offer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Offer"
+    delete:
+      operationId: deleteOffer
+      tags: [offers]
+      summary: Delete an offer
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /offers/{id}/convert-to-contract:
+    post:
+      operationId: convertOfferToContract
+      tags: [offers]
+      summary: Convert offer to contract
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConvertOfferBody"
+      responses:
+        "201":
+          description: Contract created from offer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contract"
+
+  # ───── CONTRACTS ─────
+  /contracts:
+    get:
+      operationId: listContracts
+      tags: [contracts]
+      summary: List all contracts
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: List of contracts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contract"
+    post:
+      operationId: createContract
+      tags: [contracts]
+      summary: Create a contract
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateContractBody"
+      responses:
+        "201":
+          description: Created contract
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contract"
+
+  /contracts/{id}:
+    get:
+      operationId: getContract
+      tags: [contracts]
+      summary: Get a contract
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Contract
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contract"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateContract
+      tags: [contracts]
+      summary: Update a contract
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContractBody"
+      responses:
+        "200":
+          description: Updated contract
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contract"
+    delete:
+      operationId: deleteContract
+      tags: [contracts]
+      summary: Delete a contract
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /contract-templates:
+    get:
+      operationId: listContractTemplates
+      tags: [contracts]
+      summary: List contract templates
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: List of contract templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContractTemplate"
+    post:
+      operationId: createContractTemplate
+      tags: [contracts]
+      summary: Create a contract template
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateContractTemplateBody"
+      responses:
+        "201":
+          description: Created template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContractTemplate"
+
+  /contract-templates/{id}:
+    patch:
+      operationId: updateContractTemplate
+      tags: [contracts]
+      summary: Update a contract template
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContractTemplateBody"
+      responses:
+        "200":
+          description: Updated template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContractTemplate"
+
+  # ───── INVOICES ─────
+  /invoices:
+    get:
+      operationId: listInvoices
+      tags: [invoices]
+      summary: List all invoices
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: companyId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of invoices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invoice"
+    post:
+      operationId: createInvoice
+      tags: [invoices]
+      summary: Create an invoice
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInvoiceBody"
+      responses:
+        "201":
+          description: Created invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  /invoices/{id}:
+    get:
+      operationId: getInvoice
+      tags: [invoices]
+      summary: Get an invoice
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateInvoice
+      tags: [invoices]
+      summary: Update an invoice
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateInvoiceBody"
+      responses:
+        "200":
+          description: Updated invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+    delete:
+      operationId: deleteInvoice
+      tags: [invoices]
+      summary: Delete an invoice
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /invoices/export/datev:
+    get:
+      operationId: exportDatev
+      tags: [invoices]
+      summary: Export German invoices in DATEV CSV format
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: DATEV CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /invoices/export/tally:
+    get:
+      operationId: exportTally
+      tags: [invoices]
+      summary: Export Indian invoices in Tally XML/CSV format
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            description: "xml or csv"
+      responses:
+        "200":
+          description: Tally export file
+          content:
+            application/xml:
+              schema:
+                type: string
+            text/csv:
+              schema:
+                type: string
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1783,3 +2221,528 @@ components:
         completedAt:
           type: ["string", "null"]
           format: date-time
+
+    # ─── Offers ───
+    OfferLineItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        offerId:
+          type: integer
+        description:
+          type: string
+        quantity:
+          type: string
+        unitPrice:
+          type: string
+        amount:
+          type: string
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - offerId
+        - description
+        - quantity
+        - unitPrice
+        - amount
+        - sortOrder
+        - createdAt
+
+    Offer:
+      type: object
+      properties:
+        id:
+          type: integer
+        offerNumber:
+          type: string
+        companyId:
+          type: integer
+        projectId:
+          type: ["integer", "null"]
+        clientId:
+          type: ["integer", "null"]
+        title:
+          type: string
+        notes:
+          type: ["string", "null"]
+        validUntil:
+          type: ["string", "null"]
+        status:
+          type: string
+          description: "One of: draft, sent, accepted, rejected, expired"
+        subtotal:
+          type: string
+        taxAmount:
+          type: string
+        totalAmount:
+          type: string
+        currency:
+          type: string
+        lineItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/OfferLineItem"
+        company:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Company"
+        client:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/UserBasic"
+        project:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ProjectBasic"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - offerNumber
+        - companyId
+        - title
+        - status
+        - subtotal
+        - taxAmount
+        - totalAmount
+        - currency
+        - lineItems
+        - createdAt
+        - updatedAt
+
+    CreateOfferLineItemBody:
+      type: object
+      properties:
+        description:
+          type: string
+        quantity:
+          type: string
+        unitPrice:
+          type: string
+        sortOrder:
+          type: integer
+      required:
+        - description
+
+    CreateOfferBody:
+      type: object
+      properties:
+        companyId:
+          type: integer
+        projectId:
+          type: ["integer", "null"]
+        clientId:
+          type: ["integer", "null"]
+        title:
+          type: string
+        notes:
+          type: ["string", "null"]
+        validUntil:
+          type: ["string", "null"]
+        currency:
+          type: string
+        lineItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateOfferLineItemBody"
+      required:
+        - companyId
+        - title
+
+    UpdateOfferBody:
+      type: object
+      properties:
+        title:
+          type: string
+        notes:
+          type: ["string", "null"]
+        validUntil:
+          type: ["string", "null"]
+        status:
+          type: string
+        currency:
+          type: string
+        lineItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateOfferLineItemBody"
+
+    ConvertOfferBody:
+      type: object
+      properties:
+        type:
+          type: string
+          description: "One of: client_service, freelancer_service"
+
+    ProjectBasic:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+        - id
+        - name
+
+    # ─── Contracts ───
+    Contract:
+      type: object
+      properties:
+        id:
+          type: integer
+        contractNumber:
+          type: string
+        type:
+          type: string
+          description: "One of: client_service, freelancer_service"
+        companyId:
+          type: integer
+        projectId:
+          type: ["integer", "null"]
+        clientId:
+          type: ["integer", "null"]
+        offerId:
+          type: ["integer", "null"]
+        title:
+          type: string
+        content:
+          type: string
+        status:
+          type: string
+          description: "One of: draft, sent, signed, cancelled"
+        signedAt:
+          type: ["string", "null"]
+          format: date-time
+        startDate:
+          type: ["string", "null"]
+        endDate:
+          type: ["string", "null"]
+        company:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Company"
+        client:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/UserBasic"
+        project:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ProjectBasic"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - contractNumber
+        - type
+        - companyId
+        - title
+        - content
+        - status
+        - createdAt
+        - updatedAt
+
+    CreateContractBody:
+      type: object
+      properties:
+        type:
+          type: string
+          description: "One of: client_service, freelancer_service"
+        companyId:
+          type: integer
+        projectId:
+          type: ["integer", "null"]
+        clientId:
+          type: ["integer", "null"]
+        title:
+          type: string
+        content:
+          type: string
+        startDate:
+          type: ["string", "null"]
+        endDate:
+          type: ["string", "null"]
+      required:
+        - type
+        - companyId
+        - title
+        - content
+
+    UpdateContractBody:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        status:
+          type: string
+        startDate:
+          type: ["string", "null"]
+        endDate:
+          type: ["string", "null"]
+
+    ContractTemplate:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+        content:
+          type: string
+        isDefault:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - type
+        - content
+        - isDefault
+        - createdAt
+        - updatedAt
+
+    CreateContractTemplateBody:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        content:
+          type: string
+        isDefault:
+          type: boolean
+      required:
+        - name
+        - type
+        - content
+
+    UpdateContractTemplateBody:
+      type: object
+      properties:
+        name:
+          type: string
+        content:
+          type: string
+        isDefault:
+          type: boolean
+
+    # ─── Invoices ───
+    InvoiceLineItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        invoiceId:
+          type: integer
+        timeEntryId:
+          type: ["integer", "null"]
+        description:
+          type: string
+        quantity:
+          type: string
+        unitPrice:
+          type: string
+        amount:
+          type: string
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - invoiceId
+        - description
+        - quantity
+        - unitPrice
+        - amount
+        - sortOrder
+        - createdAt
+
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: integer
+        invoiceNumber:
+          type: string
+        companyId:
+          type: integer
+        projectId:
+          type: ["integer", "null"]
+        clientId:
+          type: ["integer", "null"]
+        title:
+          type: string
+        notes:
+          type: ["string", "null"]
+        issueDate:
+          type: string
+        dueDate:
+          type: ["string", "null"]
+        status:
+          type: string
+          description: "One of: draft, sent, paid, overdue, cancelled"
+        taxType:
+          type: string
+          description: "One of: none, vat, cgst_sgst, igst"
+        taxRate:
+          type: string
+        subtotal:
+          type: string
+        taxAmount:
+          type: string
+        totalAmount:
+          type: string
+        currency:
+          type: string
+        isRecurring:
+          type: boolean
+        recurringInterval:
+          type: ["string", "null"]
+        nextInvoiceDate:
+          type: ["string", "null"]
+        lineItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceLineItem"
+        company:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Company"
+        client:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/UserBasic"
+        project:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ProjectBasic"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - invoiceNumber
+        - companyId
+        - title
+        - issueDate
+        - status
+        - taxType
+        - taxRate
+        - subtotal
+        - taxAmount
+        - totalAmount
+        - currency
+        - isRecurring
+        - lineItems
+        - createdAt
+        - updatedAt
+
+    CreateInvoiceLineItemBody:
+      type: object
+      properties:
+        timeEntryId:
+          type: ["integer", "null"]
+        description:
+          type: string
+        quantity:
+          type: string
+        unitPrice:
+          type: string
+        sortOrder:
+          type: integer
+      required:
+        - description
+
+    CreateInvoiceBody:
+      type: object
+      properties:
+        companyId:
+          type: integer
+        projectId:
+          type: ["integer", "null"]
+        clientId:
+          type: ["integer", "null"]
+        title:
+          type: string
+        notes:
+          type: ["string", "null"]
+        issueDate:
+          type: string
+        dueDate:
+          type: ["string", "null"]
+        taxType:
+          type: string
+        sellerState:
+          type: ["string", "null"]
+          description: Indian state of the seller (for GST intra/inter-state detection)
+        buyerState:
+          type: ["string", "null"]
+          description: Indian state of the buyer (for GST intra/inter-state detection)
+        currency:
+          type: string
+        isRecurring:
+          type: boolean
+        recurringInterval:
+          type: ["string", "null"]
+        lineItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateInvoiceLineItemBody"
+      required:
+        - companyId
+        - title
+        - issueDate
+
+    UpdateInvoiceBody:
+      type: object
+      properties:
+        title:
+          type: string
+        notes:
+          type: ["string", "null"]
+        issueDate:
+          type: string
+        dueDate:
+          type: ["string", "null"]
+        status:
+          type: string
+        isRecurring:
+          type: boolean
+        recurringInterval:
+          type: ["string", "null"]
+        nextInvoiceDate:
+          type: ["string", "null"]
+        lineItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateInvoiceLineItemBody"
+

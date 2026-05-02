@@ -1021,3 +1021,833 @@ export const UpdateTodoResponse = zod.object({
 export const DeleteTodoParams = zod.object({
   id: zod.coerce.number(),
 });
+
+/**
+ * @summary List all offers
+ */
+export const ListOffersResponseItem = zod.object({
+  id: zod.number(),
+  offerNumber: zod.string(),
+  companyId: zod.number(),
+  projectId: zod.number().nullish(),
+  clientId: zod.number().nullish(),
+  title: zod.string(),
+  notes: zod.string().nullish(),
+  validUntil: zod.string().nullish(),
+  status: zod
+    .string()
+    .describe("One of: draft, sent, accepted, rejected, expired"),
+  subtotal: zod.string(),
+  taxAmount: zod.string(),
+  totalAmount: zod.string(),
+  currency: zod.string(),
+  lineItems: zod.array(
+    zod.object({
+      id: zod.number(),
+      offerId: zod.number(),
+      description: zod.string(),
+      quantity: zod.string(),
+      unitPrice: zod.string(),
+      amount: zod.string(),
+      sortOrder: zod.number(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  company: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+      legalForm: zod.string(),
+      country: zod.string(),
+      taxRegime: zod.string().describe("One of: vat, gst, none"),
+      taxNumber: zod.string().nullish(),
+      address: zod.string().nullish(),
+      bankDetails: zod.string().nullish(),
+      logoUrl: zod.string().nullish(),
+      currency: zod.string(),
+      isActive: zod.boolean(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    })
+    .nullish(),
+  client: zod
+    .object({
+      id: zod.number(),
+      email: zod.string(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+      role: zod.string(),
+    })
+    .nullish(),
+  project: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+    })
+    .nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListOffersResponse = zod.array(ListOffersResponseItem);
+
+/**
+ * @summary Create an offer
+ */
+export const CreateOfferBody = zod.object({
+  companyId: zod.number(),
+  projectId: zod.number().nullish(),
+  clientId: zod.number().nullish(),
+  title: zod.string(),
+  notes: zod.string().nullish(),
+  validUntil: zod.string().nullish(),
+  currency: zod.string().optional(),
+  lineItems: zod
+    .array(
+      zod.object({
+        description: zod.string(),
+        quantity: zod.string().optional(),
+        unitPrice: zod.string().optional(),
+        sortOrder: zod.number().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Get an offer
+ */
+export const GetOfferParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetOfferResponse = zod.object({
+  id: zod.number(),
+  offerNumber: zod.string(),
+  companyId: zod.number(),
+  projectId: zod.number().nullish(),
+  clientId: zod.number().nullish(),
+  title: zod.string(),
+  notes: zod.string().nullish(),
+  validUntil: zod.string().nullish(),
+  status: zod
+    .string()
+    .describe("One of: draft, sent, accepted, rejected, expired"),
+  subtotal: zod.string(),
+  taxAmount: zod.string(),
+  totalAmount: zod.string(),
+  currency: zod.string(),
+  lineItems: zod.array(
+    zod.object({
+      id: zod.number(),
+      offerId: zod.number(),
+      description: zod.string(),
+      quantity: zod.string(),
+      unitPrice: zod.string(),
+      amount: zod.string(),
+      sortOrder: zod.number(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  company: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+      legalForm: zod.string(),
+      country: zod.string(),
+      taxRegime: zod.string().describe("One of: vat, gst, none"),
+      taxNumber: zod.string().nullish(),
+      address: zod.string().nullish(),
+      bankDetails: zod.string().nullish(),
+      logoUrl: zod.string().nullish(),
+      currency: zod.string(),
+      isActive: zod.boolean(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    })
+    .nullish(),
+  client: zod
+    .object({
+      id: zod.number(),
+      email: zod.string(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+      role: zod.string(),
+    })
+    .nullish(),
+  project: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+    })
+    .nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Update an offer
+ */
+export const UpdateOfferParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateOfferBody = zod.object({
+  title: zod.string().optional(),
+  notes: zod.string().nullish(),
+  validUntil: zod.string().nullish(),
+  status: zod.string().optional(),
+  currency: zod.string().optional(),
+  lineItems: zod
+    .array(
+      zod.object({
+        description: zod.string(),
+        quantity: zod.string().optional(),
+        unitPrice: zod.string().optional(),
+        sortOrder: zod.number().optional(),
+      }),
+    )
+    .optional(),
+});
+
+export const UpdateOfferResponse = zod.object({
+  id: zod.number(),
+  offerNumber: zod.string(),
+  companyId: zod.number(),
+  projectId: zod.number().nullish(),
+  clientId: zod.number().nullish(),
+  title: zod.string(),
+  notes: zod.string().nullish(),
+  validUntil: zod.string().nullish(),
+  status: zod
+    .string()
+    .describe("One of: draft, sent, accepted, rejected, expired"),
+  subtotal: zod.string(),
+  taxAmount: zod.string(),
+  totalAmount: zod.string(),
+  currency: zod.string(),
+  lineItems: zod.array(
+    zod.object({
+      id: zod.number(),
+      offerId: zod.number(),
+      description: zod.string(),
+      quantity: zod.string(),
+      unitPrice: zod.string(),
+      amount: zod.string(),
+      sortOrder: zod.number(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  company: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+      legalForm: zod.string(),
+      country: zod.string(),
+      taxRegime: zod.string().describe("One of: vat, gst, none"),
+      taxNumber: zod.string().nullish(),
+      address: zod.string().nullish(),
+      bankDetails: zod.string().nullish(),
+      logoUrl: zod.string().nullish(),
+      currency: zod.string(),
+      isActive: zod.boolean(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    })
+    .nullish(),
+  client: zod
+    .object({
+      id: zod.number(),
+      email: zod.string(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+      role: zod.string(),
+    })
+    .nullish(),
+  project: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+    })
+    .nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete an offer
+ */
+export const DeleteOfferParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Convert offer to contract
+ */
+export const ConvertOfferToContractParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ConvertOfferToContractBody = zod.object({
+  type: zod
+    .string()
+    .optional()
+    .describe("One of: client_service, freelancer_service"),
+});
+
+/**
+ * @summary List all contracts
+ */
+export const ListContractsResponseItem = zod.object({
+  id: zod.number(),
+  contractNumber: zod.string(),
+  type: zod.string().describe("One of: client_service, freelancer_service"),
+  companyId: zod.number(),
+  projectId: zod.number().nullish(),
+  clientId: zod.number().nullish(),
+  offerId: zod.number().nullish(),
+  title: zod.string(),
+  content: zod.string(),
+  status: zod.string().describe("One of: draft, sent, signed, cancelled"),
+  signedAt: zod.coerce.date().nullish(),
+  startDate: zod.string().nullish(),
+  endDate: zod.string().nullish(),
+  company: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+      legalForm: zod.string(),
+      country: zod.string(),
+      taxRegime: zod.string().describe("One of: vat, gst, none"),
+      taxNumber: zod.string().nullish(),
+      address: zod.string().nullish(),
+      bankDetails: zod.string().nullish(),
+      logoUrl: zod.string().nullish(),
+      currency: zod.string(),
+      isActive: zod.boolean(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    })
+    .nullish(),
+  client: zod
+    .object({
+      id: zod.number(),
+      email: zod.string(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+      role: zod.string(),
+    })
+    .nullish(),
+  project: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+    })
+    .nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListContractsResponse = zod.array(ListContractsResponseItem);
+
+/**
+ * @summary Create a contract
+ */
+export const CreateContractBody = zod.object({
+  type: zod.string().describe("One of: client_service, freelancer_service"),
+  companyId: zod.number(),
+  projectId: zod.number().nullish(),
+  clientId: zod.number().nullish(),
+  title: zod.string(),
+  content: zod.string(),
+  startDate: zod.string().nullish(),
+  endDate: zod.string().nullish(),
+});
+
+/**
+ * @summary Get a contract
+ */
+export const GetContractParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetContractResponse = zod.object({
+  id: zod.number(),
+  contractNumber: zod.string(),
+  type: zod.string().describe("One of: client_service, freelancer_service"),
+  companyId: zod.number(),
+  projectId: zod.number().nullish(),
+  clientId: zod.number().nullish(),
+  offerId: zod.number().nullish(),
+  title: zod.string(),
+  content: zod.string(),
+  status: zod.string().describe("One of: draft, sent, signed, cancelled"),
+  signedAt: zod.coerce.date().nullish(),
+  startDate: zod.string().nullish(),
+  endDate: zod.string().nullish(),
+  company: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+      legalForm: zod.string(),
+      country: zod.string(),
+      taxRegime: zod.string().describe("One of: vat, gst, none"),
+      taxNumber: zod.string().nullish(),
+      address: zod.string().nullish(),
+      bankDetails: zod.string().nullish(),
+      logoUrl: zod.string().nullish(),
+      currency: zod.string(),
+      isActive: zod.boolean(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    })
+    .nullish(),
+  client: zod
+    .object({
+      id: zod.number(),
+      email: zod.string(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+      role: zod.string(),
+    })
+    .nullish(),
+  project: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+    })
+    .nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Update a contract
+ */
+export const UpdateContractParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateContractBody = zod.object({
+  title: zod.string().optional(),
+  content: zod.string().optional(),
+  status: zod.string().optional(),
+  startDate: zod.string().nullish(),
+  endDate: zod.string().nullish(),
+});
+
+export const UpdateContractResponse = zod.object({
+  id: zod.number(),
+  contractNumber: zod.string(),
+  type: zod.string().describe("One of: client_service, freelancer_service"),
+  companyId: zod.number(),
+  projectId: zod.number().nullish(),
+  clientId: zod.number().nullish(),
+  offerId: zod.number().nullish(),
+  title: zod.string(),
+  content: zod.string(),
+  status: zod.string().describe("One of: draft, sent, signed, cancelled"),
+  signedAt: zod.coerce.date().nullish(),
+  startDate: zod.string().nullish(),
+  endDate: zod.string().nullish(),
+  company: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+      legalForm: zod.string(),
+      country: zod.string(),
+      taxRegime: zod.string().describe("One of: vat, gst, none"),
+      taxNumber: zod.string().nullish(),
+      address: zod.string().nullish(),
+      bankDetails: zod.string().nullish(),
+      logoUrl: zod.string().nullish(),
+      currency: zod.string(),
+      isActive: zod.boolean(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    })
+    .nullish(),
+  client: zod
+    .object({
+      id: zod.number(),
+      email: zod.string(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+      role: zod.string(),
+    })
+    .nullish(),
+  project: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+    })
+    .nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete a contract
+ */
+export const DeleteContractParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List contract templates
+ */
+export const ListContractTemplatesResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  type: zod.string(),
+  content: zod.string(),
+  isDefault: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListContractTemplatesResponse = zod.array(
+  ListContractTemplatesResponseItem,
+);
+
+/**
+ * @summary Create a contract template
+ */
+export const CreateContractTemplateBody = zod.object({
+  name: zod.string(),
+  type: zod.string(),
+  content: zod.string(),
+  isDefault: zod.boolean().optional(),
+});
+
+/**
+ * @summary Update a contract template
+ */
+export const UpdateContractTemplateParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateContractTemplateBody = zod.object({
+  name: zod.string().optional(),
+  content: zod.string().optional(),
+  isDefault: zod.boolean().optional(),
+});
+
+export const UpdateContractTemplateResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  type: zod.string(),
+  content: zod.string(),
+  isDefault: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List all invoices
+ */
+export const ListInvoicesQueryParams = zod.object({
+  status: zod.coerce.string().optional(),
+  companyId: zod.coerce.number().optional(),
+});
+
+export const ListInvoicesResponseItem = zod.object({
+  id: zod.number(),
+  invoiceNumber: zod.string(),
+  companyId: zod.number(),
+  projectId: zod.number().nullish(),
+  clientId: zod.number().nullish(),
+  title: zod.string(),
+  notes: zod.string().nullish(),
+  issueDate: zod.string(),
+  dueDate: zod.string().nullish(),
+  status: zod
+    .string()
+    .describe("One of: draft, sent, paid, overdue, cancelled"),
+  taxType: zod.string().describe("One of: none, vat, cgst_sgst, igst"),
+  taxRate: zod.string(),
+  subtotal: zod.string(),
+  taxAmount: zod.string(),
+  totalAmount: zod.string(),
+  currency: zod.string(),
+  isRecurring: zod.boolean(),
+  recurringInterval: zod.string().nullish(),
+  nextInvoiceDate: zod.string().nullish(),
+  lineItems: zod.array(
+    zod.object({
+      id: zod.number(),
+      invoiceId: zod.number(),
+      timeEntryId: zod.number().nullish(),
+      description: zod.string(),
+      quantity: zod.string(),
+      unitPrice: zod.string(),
+      amount: zod.string(),
+      sortOrder: zod.number(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  company: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+      legalForm: zod.string(),
+      country: zod.string(),
+      taxRegime: zod.string().describe("One of: vat, gst, none"),
+      taxNumber: zod.string().nullish(),
+      address: zod.string().nullish(),
+      bankDetails: zod.string().nullish(),
+      logoUrl: zod.string().nullish(),
+      currency: zod.string(),
+      isActive: zod.boolean(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    })
+    .nullish(),
+  client: zod
+    .object({
+      id: zod.number(),
+      email: zod.string(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+      role: zod.string(),
+    })
+    .nullish(),
+  project: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+    })
+    .nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListInvoicesResponse = zod.array(ListInvoicesResponseItem);
+
+/**
+ * @summary Create an invoice
+ */
+export const CreateInvoiceBody = zod.object({
+  companyId: zod.number(),
+  projectId: zod.number().nullish(),
+  clientId: zod.number().nullish(),
+  title: zod.string(),
+  notes: zod.string().nullish(),
+  issueDate: zod.string(),
+  dueDate: zod.string().nullish(),
+  taxType: zod.string().optional(),
+  sellerState: zod
+    .string()
+    .nullish()
+    .describe(
+      "Indian state of the seller (for GST intra\/inter-state detection)",
+    ),
+  buyerState: zod
+    .string()
+    .nullish()
+    .describe(
+      "Indian state of the buyer (for GST intra\/inter-state detection)",
+    ),
+  currency: zod.string().optional(),
+  isRecurring: zod.boolean().optional(),
+  recurringInterval: zod.string().nullish(),
+  lineItems: zod
+    .array(
+      zod.object({
+        timeEntryId: zod.number().nullish(),
+        description: zod.string(),
+        quantity: zod.string().optional(),
+        unitPrice: zod.string().optional(),
+        sortOrder: zod.number().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Get an invoice
+ */
+export const GetInvoiceParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetInvoiceResponse = zod.object({
+  id: zod.number(),
+  invoiceNumber: zod.string(),
+  companyId: zod.number(),
+  projectId: zod.number().nullish(),
+  clientId: zod.number().nullish(),
+  title: zod.string(),
+  notes: zod.string().nullish(),
+  issueDate: zod.string(),
+  dueDate: zod.string().nullish(),
+  status: zod
+    .string()
+    .describe("One of: draft, sent, paid, overdue, cancelled"),
+  taxType: zod.string().describe("One of: none, vat, cgst_sgst, igst"),
+  taxRate: zod.string(),
+  subtotal: zod.string(),
+  taxAmount: zod.string(),
+  totalAmount: zod.string(),
+  currency: zod.string(),
+  isRecurring: zod.boolean(),
+  recurringInterval: zod.string().nullish(),
+  nextInvoiceDate: zod.string().nullish(),
+  lineItems: zod.array(
+    zod.object({
+      id: zod.number(),
+      invoiceId: zod.number(),
+      timeEntryId: zod.number().nullish(),
+      description: zod.string(),
+      quantity: zod.string(),
+      unitPrice: zod.string(),
+      amount: zod.string(),
+      sortOrder: zod.number(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  company: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+      legalForm: zod.string(),
+      country: zod.string(),
+      taxRegime: zod.string().describe("One of: vat, gst, none"),
+      taxNumber: zod.string().nullish(),
+      address: zod.string().nullish(),
+      bankDetails: zod.string().nullish(),
+      logoUrl: zod.string().nullish(),
+      currency: zod.string(),
+      isActive: zod.boolean(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    })
+    .nullish(),
+  client: zod
+    .object({
+      id: zod.number(),
+      email: zod.string(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+      role: zod.string(),
+    })
+    .nullish(),
+  project: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+    })
+    .nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Update an invoice
+ */
+export const UpdateInvoiceParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateInvoiceBody = zod.object({
+  title: zod.string().optional(),
+  notes: zod.string().nullish(),
+  issueDate: zod.string().optional(),
+  dueDate: zod.string().nullish(),
+  status: zod.string().optional(),
+  isRecurring: zod.boolean().optional(),
+  recurringInterval: zod.string().nullish(),
+  nextInvoiceDate: zod.string().nullish(),
+  lineItems: zod
+    .array(
+      zod.object({
+        timeEntryId: zod.number().nullish(),
+        description: zod.string(),
+        quantity: zod.string().optional(),
+        unitPrice: zod.string().optional(),
+        sortOrder: zod.number().optional(),
+      }),
+    )
+    .optional(),
+});
+
+export const UpdateInvoiceResponse = zod.object({
+  id: zod.number(),
+  invoiceNumber: zod.string(),
+  companyId: zod.number(),
+  projectId: zod.number().nullish(),
+  clientId: zod.number().nullish(),
+  title: zod.string(),
+  notes: zod.string().nullish(),
+  issueDate: zod.string(),
+  dueDate: zod.string().nullish(),
+  status: zod
+    .string()
+    .describe("One of: draft, sent, paid, overdue, cancelled"),
+  taxType: zod.string().describe("One of: none, vat, cgst_sgst, igst"),
+  taxRate: zod.string(),
+  subtotal: zod.string(),
+  taxAmount: zod.string(),
+  totalAmount: zod.string(),
+  currency: zod.string(),
+  isRecurring: zod.boolean(),
+  recurringInterval: zod.string().nullish(),
+  nextInvoiceDate: zod.string().nullish(),
+  lineItems: zod.array(
+    zod.object({
+      id: zod.number(),
+      invoiceId: zod.number(),
+      timeEntryId: zod.number().nullish(),
+      description: zod.string(),
+      quantity: zod.string(),
+      unitPrice: zod.string(),
+      amount: zod.string(),
+      sortOrder: zod.number(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  company: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+      legalForm: zod.string(),
+      country: zod.string(),
+      taxRegime: zod.string().describe("One of: vat, gst, none"),
+      taxNumber: zod.string().nullish(),
+      address: zod.string().nullish(),
+      bankDetails: zod.string().nullish(),
+      logoUrl: zod.string().nullish(),
+      currency: zod.string(),
+      isActive: zod.boolean(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    })
+    .nullish(),
+  client: zod
+    .object({
+      id: zod.number(),
+      email: zod.string(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+      role: zod.string(),
+    })
+    .nullish(),
+  project: zod
+    .object({
+      id: zod.number(),
+      name: zod.string(),
+    })
+    .nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete an invoice
+ */
+export const DeleteInvoiceParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Export Indian invoices in Tally XML/CSV format
+ */
+export const ExportTallyQueryParams = zod.object({
+  format: zod.coerce.string().optional(),
+});

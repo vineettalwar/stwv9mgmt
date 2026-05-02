@@ -9,6 +9,10 @@ import {
   Clock,
   FolderOpen,
   ClipboardList,
+  FileText,
+  FileSignature,
+  Receipt,
+  Archive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClerk } from "@clerk/react";
@@ -72,6 +76,34 @@ const navigation: NavItem[] = [
     href: "/todos",
     icon: ClipboardList,
     testId: "nav-todos",
+    allowedRoles: ["admin", "germany_accountant", "india_accountant", "project_manager"],
+  },
+  {
+    name: "Documents",
+    href: "/documents",
+    icon: Archive,
+    testId: "nav-documents",
+    allowedRoles: ["admin", "germany_accountant", "india_accountant", "project_manager"],
+  },
+  {
+    name: "Offers",
+    href: "/offers",
+    icon: FileText,
+    testId: "nav-offers",
+    allowedRoles: ["admin", "germany_accountant", "india_accountant", "project_manager"],
+  },
+  {
+    name: "Contracts",
+    href: "/contracts",
+    icon: FileSignature,
+    testId: "nav-contracts",
+    allowedRoles: ["admin", "germany_accountant", "india_accountant", "project_manager"],
+  },
+  {
+    name: "Invoices",
+    href: "/invoices",
+    icon: Receipt,
+    testId: "nav-invoices",
     allowedRoles: ["admin", "germany_accountant", "india_accountant", "project_manager"],
   },
   {
@@ -143,27 +175,27 @@ export function Sidebar() {
             {visibleNav.map((item) => {
               const isActive = location.startsWith(item.href);
               return (
-                <Link key={item.testId} href={item.href}>
-                  <a
-                    data-testid={item.testId}
+                <Link
+                  key={item.testId}
+                  href={item.href}
+                  data-testid={item.testId}
+                  className={cn(
+                    isActive
+                      ? "bg-slate-800 text-white"
+                      : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-100",
+                    "group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  )}
+                >
+                  <item.icon
                     className={cn(
                       isActive
-                        ? "bg-slate-800 text-white"
-                        : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-100",
-                      "group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        ? "text-slate-300"
+                        : "text-slate-500 group-hover:text-slate-300",
+                      "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
                     )}
-                  >
-                    <item.icon
-                      className={cn(
-                        isActive
-                          ? "text-slate-300"
-                          : "text-slate-500 group-hover:text-slate-300",
-                        "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
-                      )}
-                      aria-hidden="true"
-                    />
-                    {item.name}
-                  </a>
+                    aria-hidden="true"
+                  />
+                  {item.name}
                 </Link>
               );
             })}
