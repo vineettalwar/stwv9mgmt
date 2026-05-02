@@ -27,7 +27,7 @@ type CalendarEvent = {
 
 const COMPLIANCE_ROLES = ["admin", "germany_accountant", "india_accountant"];
 const INVOICE_ROLES = ["admin", "germany_accountant", "india_accountant", "project_manager"];
-const MILESTONE_ROLES = ["admin", "germany_accountant", "india_accountant", "project_manager", "employee", "freelancer"];
+const MILESTONE_ROLES = ["admin", "germany_accountant", "india_accountant", "project_manager", "freelancer"];
 
 router.get("/calendar/events", requireAuth, loadDbUser, async (req, res): Promise<void> => {
   const user = req.dbUser!;
@@ -53,7 +53,7 @@ router.get("/calendar/events", requireAuth, loadDbUser, async (req, res): Promis
   const events: CalendarEvent[] = [];
 
   if (MILESTONE_ROLES.includes(user.role)) {
-    if (user.role === "freelancer" || user.role === "employee") {
+    if (user.role === "freelancer") {
       const assignments = await db
         .select({ projectId: projectAssignmentsTable.projectId })
         .from(projectAssignmentsTable)
