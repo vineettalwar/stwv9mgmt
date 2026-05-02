@@ -156,17 +156,29 @@ paths:
     post:
       operationId: createUser
       tags: [users]
-      summary: Create or sync a user
+      summary: Provision or sync authenticated user
+      description: >
+        Creates a platform user record for the authenticated Clerk user if one
+        does not already exist (auto-provision). All identity (email, name) is
+        derived server-side from the Clerk JWT — request body fields are optional
+        hints only and are never trusted for identity or role assignment.
+        Returns 201 for a newly created user, 200 if the user already exists.
       security: [{ bearerAuth: [] }]
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/CreateUserBody"
       responses:
         "201":
-          description: Created
+          description: User created (new account)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "200":
+          description: User already exists (returned as-is)
           content:
             application/json:
               schema:
@@ -176,17 +188,46 @@ paths:
     get:
       operationId: getMe
       tags: [users]
-      summary: Get current authenticated user profile
+      summary: Get (or auto-provision) current authenticated user profile
+      description: >
+        Returns the platform user record for the authenticated Clerk user.
+        If no record exists yet, one is auto-provisioned from the Clerk identity
+        (email, name derived server-side). Never returns 404.
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          description: Current user
+          description: Current user (created if first visit)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
-        "404":
-          description: User not found
+
+  /admin/users:
+    post:
+      operationId: adminCreateUser
+      tags: [users]
+      summary: Pre-register a user (admin only)
+      description: >
+        Admin-only endpoint to pre-register a user with a specific role before
+        they sign up via Clerk. A placeholder clerkUserId of "pending:{email}" is
+        stored; it is linked to the real Clerk account when the user first signs
+        in and their account is provisioned via GET /users/me or POST /users.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminCreateUserBody"
+      responses:
+        "201":
+          description: Pre-registered user created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "409":
+          description: Email already registered
           content:
             application/json:
               schema:
@@ -498,21 +539,34 @@ components:
 
     CreateUserBody:
       type: object
+      description: >
+        All fields are optional hints. Identity (email, name, role) is always
+        derived server-side from the Clerk auth token. Client-provided values
+        are ignored for security.
       properties:
-        clerkUserId:
-          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+
+    AdminCreateUserBody:
+      type: object
+      description: >
+        Pre-register a user before they sign up. Email is required; the Clerk
+        account will be linked automatically when the user first signs in.
+      properties:
         email:
           type: string
+          format: email
         firstName:
           type: ["string", "null"]
         lastName:
           type: ["string", "null"]
         role:
           type: string
+          description: "One of: admin, germany_accountant, india_accountant, project_manager, client, freelancer"
       required:
-        - clerkUserId
         - email
-        - role
 
     UpdateUserBody:
       type: object

@@ -115,15 +115,20 @@ router.get("/users", requireAuth, requireAdmin, async (_req, res): Promise<void>
   res.json(ListUsersResponse.parse(usersWithCompanies));
 });
 
-// Self-register or re-fetch current user — any authenticated user.
-// All identity is derived from Clerk server-side; body is entirely ignored for auth fields.
+// Provision or sync authenticated user — any Clerk-authenticated user.
+// Body is ignored for identity/role; all fields are derived server-side from Clerk.
+// Returns 201 when a new platform user is created, 200 when one already exists.
 router.post("/users", requireAuth, async (req, res): Promise<void> => {
   const auth = getAuth(req);
   const clerkId = auth!.userId!;
   try {
+    // Check if user already exists before provisioning
+    const existing = await db.select().from(usersTable)
+      .where(eq(usersTable.clerkUserId, clerkId)).then(r => r[0]);
     const user = await provisionUserFromClerk(clerkId);
     const full = await getUserWithCompanies(user.id);
-    res.status(200).json(GetUserResponse.parse(full));
+    const status = existing ? 200 : 201;
+    res.status(status).json(GetUserResponse.parse(full));
   } catch (err: unknown) {
     const e = err as { status?: number; message?: string };
     res.status(e.status ?? 500).json({ error: e.message ?? "Failed to provision user" });

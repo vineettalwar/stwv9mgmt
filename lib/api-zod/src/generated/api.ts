@@ -154,14 +154,32 @@ export const ListUsersResponseItem = zod.object({
 export const ListUsersResponse = zod.array(ListUsersResponseItem);
 
 /**
- * @summary Create or sync a user
+ * @summary Provision or sync authenticated user
+ * All fields are optional hints. Identity is always derived server-side
+ * from the Clerk auth token — client values are ignored for security.
  */
 export const CreateUserBody = zod.object({
-  clerkUserId: zod.string(),
-  email: zod.string(),
   firstName: zod.string().nullish(),
   lastName: zod.string().nullish(),
-  role: zod.string(),
+}).optional();
+
+/**
+ * @summary Pre-register a user (admin only)
+ */
+export const AdminCreateUserBody = zod.object({
+  email: zod.string().email(),
+  firstName: zod.string().nullish(),
+  lastName: zod.string().nullish(),
+  role: zod
+    .enum([
+      "admin",
+      "germany_accountant",
+      "india_accountant",
+      "project_manager",
+      "client",
+      "freelancer",
+    ])
+    .default("freelancer"),
 });
 
 /**
