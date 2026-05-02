@@ -480,7 +480,7 @@ export const CreateProjectBody = zod.object({
     .string()
     .optional()
     .describe(
-      "One of: active, completed, on_hold (use POST \/projects\/:id\/archive to archive)",
+      "One of: active, completed, on_hold (use DELETE \/projects\/:id to archive)",
     ),
   billingModel: zod.string().describe("One of: hourly, fixed, retainer"),
   fixedAllocationHours: zod.string().nullish(),
@@ -552,7 +552,7 @@ export const UpdateProjectBody = zod.object({
     .string()
     .optional()
     .describe(
-      "One of: active, completed, on_hold (use POST \/projects\/:id\/archive to archive)",
+      "One of: active, completed, on_hold (use DELETE \/projects\/:id to archive)",
     ),
   billingModel: zod.string().optional(),
   fixedAllocationHours: zod.string().nullish(),
@@ -601,7 +601,8 @@ export const UpdateProjectResponse = zod.object({
 });
 
 /**
- * @summary Delete a project
+ * Soft-archives the project by setting status to "archived" and stamping archived_at. The row is preserved for audit history.
+ * @summary Archive a project (soft-delete)
  */
 export const DeleteProjectParams = zod.object({
   id: zod.coerce.number(),

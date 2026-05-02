@@ -1810,7 +1810,8 @@ export const useUpdateProject = <
 };
 
 /**
- * @summary Delete a project
+ * Soft-archives the project by setting status to "archived" and stamping archived_at. The row is preserved for audit history.
+ * @summary Archive a project (soft-delete)
  */
 export const getDeleteProjectUrl = (id: number) => {
   return `/api/projects/${id}`;
@@ -1871,7 +1872,7 @@ export type DeleteProjectMutationResult = NonNullable<
 export type DeleteProjectMutationError = ErrorType<unknown>;
 
 /**
- * @summary Delete a project
+ * @summary Archive a project (soft-delete)
  */
 export const useDeleteProject = <
   TError = ErrorType<unknown>,

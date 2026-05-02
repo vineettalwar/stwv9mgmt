@@ -1,9 +1,25 @@
 import { Router, type IRouter } from "express";
+import { z } from "zod";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { db, auditLogsTable, usersTable, projectAssignmentsTable, projectsTable } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
 
 const router: IRouter = Router();
+
+const isoDateLike = z
+  .string()
+  .refine((s) => !Number.isNaN(Date.parse(s)), { message: "Invalid date" });
+
+const AuditLogQuery = z.object({
+  entity_type: z.string().min(1).max(64).optional(),
+  entity_id: z.coerce.number().int().positive().optional(),
+  actor_id: z.coerce.number().int().positive().optional(),
+  action: z.string().min(1).max(64).optional(),
+  date_from: isoDateLike.optional(),
+  date_to: isoDateLike.optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional().default(100),
+  offset: z.coerce.number().int().min(0).optional().default(0),
+});
 
 // GET /audit-logs — admin only, filterable
 router.get("/audit-logs", requireAuth, loadDbUser, async (req, res): Promise<void> => {
@@ -12,33 +28,28 @@ router.get("/audit-logs", requireAuth, loadDbUser, async (req, res): Promise<voi
     res.status(403).json({ error: "Forbidden" }); return;
   }
 
+  const parsed = AuditLogQuery.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid query parameters", details: parsed.error.flatten() });
+    return;
+  }
+  const q = parsed.data;
+
   const conditions = [];
 
-  if (req.query.entity_type) {
-    conditions.push(eq(auditLogsTable.entityType, String(req.query.entity_type)));
-  }
-  if (req.query.entity_id) {
-    const eid = parseInt(String(req.query.entity_id));
-    if (!isNaN(eid)) conditions.push(eq(auditLogsTable.entityId, eid));
-  }
-  if (req.query.actor_id) {
-    const aid = parseInt(String(req.query.actor_id));
-    if (!isNaN(aid)) conditions.push(eq(auditLogsTable.actorId, aid));
-  }
-  if (req.query.action) {
-    conditions.push(eq(auditLogsTable.action, String(req.query.action)));
-  }
-  if (req.query.date_from) {
-    conditions.push(gte(auditLogsTable.createdAt, new Date(String(req.query.date_from))));
-  }
-  if (req.query.date_to) {
-    const to = new Date(String(req.query.date_to));
+  if (q.entity_type) conditions.push(eq(auditLogsTable.entityType, q.entity_type));
+  if (q.entity_id) conditions.push(eq(auditLogsTable.entityId, q.entity_id));
+  if (q.actor_id) conditions.push(eq(auditLogsTable.actorId, q.actor_id));
+  if (q.action) conditions.push(eq(auditLogsTable.action, q.action));
+  if (q.date_from) conditions.push(gte(auditLogsTable.createdAt, new Date(q.date_from)));
+  if (q.date_to) {
+    const to = new Date(q.date_to);
     to.setDate(to.getDate() + 1);
     conditions.push(lte(auditLogsTable.createdAt, to));
   }
 
-  const limitVal = Math.min(parseInt(String(req.query.limit ?? "100")), 500);
-  const offsetVal = parseInt(String(req.query.offset ?? "0")) || 0;
+  const limitVal = q.limit;
+  const offsetVal = q.offset;
 
   const baseQuery = db
     .select({

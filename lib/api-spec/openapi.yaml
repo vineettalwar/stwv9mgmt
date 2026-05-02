@@ -496,7 +496,8 @@ paths:
     delete:
       operationId: deleteProject
       tags: [projects]
-      summary: Delete a project
+      summary: Archive a project (soft-delete)
+      description: Soft-archives the project by setting status to "archived" and stamping archived_at. The row is preserved for audit history.
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -506,7 +507,7 @@ paths:
             type: integer
       responses:
         "204":
-          description: Deleted
+          description: Archived
 
   /projects/{id}/assignments:
     get:
@@ -2313,7 +2314,7 @@ components:
           type: ["string", "null"]
         status:
           type: string
-          description: "One of: active, completed, on_hold (use POST /projects/:id/archive to archive)"
+          description: "One of: active, completed, on_hold (use DELETE /projects/:id to archive)"
         billingModel:
           type: string
           description: "One of: hourly, fixed, retainer"
@@ -2344,7 +2345,7 @@ components:
           type: ["string", "null"]
         status:
           type: string
-          description: "One of: active, completed, on_hold (use POST /projects/:id/archive to archive)"
+          description: "One of: active, completed, on_hold (use DELETE /projects/:id to archive)"
         billingModel:
           type: string
         fixedAllocationHours:
