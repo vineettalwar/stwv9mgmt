@@ -22,6 +22,7 @@ import type {
   AssignUserToCompanyBody,
   AuditLog,
   BillingSummary,
+  CalendarEvent,
   Company,
   ComplianceItem,
   Contract,
@@ -54,6 +55,7 @@ import type {
   HealthStatus,
   Invoice,
   ListAuditLogsParams,
+  ListCalendarEventsParams,
   ListComplianceParams,
   ListInvoicesParams,
   ListMyTimeEntriesParams,
@@ -8284,6 +8286,103 @@ export function useExportReport<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getExportReportQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List unified calendar events (milestones, compliance deadlines, invoice due dates)
+ */
+export const getListCalendarEventsUrl = (params: ListCalendarEventsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/calendar/events?${stringifiedParams}`
+    : `/api/calendar/events`;
+};
+
+export const listCalendarEvents = async (
+  params: ListCalendarEventsParams,
+  options?: RequestInit,
+): Promise<CalendarEvent[]> => {
+  return customFetch<CalendarEvent[]>(getListCalendarEventsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListCalendarEventsQueryKey = (
+  params?: ListCalendarEventsParams,
+) => {
+  return [`/api/calendar/events`, ...(params ? [params] : [])] as const;
+};
+
+export const getListCalendarEventsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCalendarEvents>>,
+  TError = ErrorType<void>,
+>(
+  params: ListCalendarEventsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCalendarEvents>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListCalendarEventsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listCalendarEvents>>
+  > = ({ signal }) => listCalendarEvents(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCalendarEvents>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListCalendarEventsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCalendarEvents>>
+>;
+export type ListCalendarEventsQueryError = ErrorType<void>;
+
+/**
+ * @summary List unified calendar events (milestones, compliance deadlines, invoice due dates)
+ */
+
+export function useListCalendarEvents<
+  TData = Awaited<ReturnType<typeof listCalendarEvents>>,
+  TError = ErrorType<void>,
+>(
+  params: ListCalendarEventsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCalendarEvents>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListCalendarEventsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

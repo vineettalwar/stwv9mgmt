@@ -2194,6 +2194,37 @@ paths:
               schema:
                 type: string
 
+  /calendar/events:
+    get:
+      operationId: listCalendarEvents
+      summary: List unified calendar events (milestones, compliance deadlines, invoice due dates)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: start
+          required: true
+          schema: { type: string }
+          description: Start date YYYY-MM-DD (inclusive)
+        - in: query
+          name: end
+          required: true
+          schema: { type: string }
+          description: End date YYYY-MM-DD (inclusive)
+      responses:
+        "200":
+          description: List of calendar events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalendarEvent"
+        "400":
+          description: Missing or invalid date params
+        "403":
+          description: Forbidden
+
 components:
   securitySchemes:
     bearerAuth:
@@ -4066,4 +4097,38 @@ components:
           oneOf:
             - $ref: "#/components/schemas/AuditLogActor"
             - type: "null"
+
+    CalendarEvent:
+      type: object
+      required:
+        - id
+        - type
+        - title
+        - date
+        - status
+        - entityId
+        - linkPath
+      properties:
+        id:
+          type: string
+          description: "Unique identifier in format '{type}-{entityId}'"
+        type:
+          type: string
+          enum: [milestone, compliance, invoice, overdue]
+        title:
+          type: string
+        date:
+          type: string
+          description: YYYY-MM-DD
+        status:
+          type: string
+        entityId:
+          type: integer
+        projectId:
+          type: ["integer", "null"]
+        projectName:
+          type: ["string", "null"]
+        linkPath:
+          type: string
+          description: "Frontend route to the full record, e.g. /projects/1 or /invoices/3"
 

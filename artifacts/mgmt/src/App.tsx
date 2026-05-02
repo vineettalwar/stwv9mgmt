@@ -32,6 +32,7 @@ import Compliance from "@/pages/compliance";
 import Pipeline from "@/pages/pipeline";
 import AuditLog from "@/pages/audit-log";
 import Reports from "@/pages/reports";
+import CalendarPage from "@/pages/calendar";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -171,6 +172,7 @@ function Router() {
       <Route path="/compliance" component={() => <PrivateRoute component={Compliance} allowedRoles={["admin", "germany_accountant", "india_accountant"] as UserRole[]} />} />
       <Route path="/audit-log" component={() => <PrivateRoute component={AuditLog} allowedRoles={ADMIN_ONLY} />} />
       <Route path="/reports" component={() => <PrivateRoute component={Reports} allowedRoles={PM_ROLES} />} />
+      <Route path="/calendar" component={() => <PrivateRoute component={CalendarPage} allowedRoles={WORKER_ROLES} />} />
       <Route path="/settings" component={() => <PrivateRoute component={Settings} allowedRoles={ALL_ROLES} />} />
       <Route component={NotFound} />
     </Switch>

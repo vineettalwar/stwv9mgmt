@@ -2489,3 +2489,30 @@ export const ExportReportQueryParams = zod.object({
   startDate: zod.coerce.string().optional(),
   endDate: zod.coerce.string().optional(),
 });
+
+/**
+ * @summary List unified calendar events (milestones, compliance deadlines, invoice due dates)
+ */
+export const ListCalendarEventsQueryParams = zod.object({
+  start: zod.coerce.string().describe("Start date YYYY-MM-DD (inclusive)"),
+  end: zod.coerce.string().describe("End date YYYY-MM-DD (inclusive)"),
+});
+
+export const ListCalendarEventsResponseItem = zod.object({
+  id: zod.string().describe("Unique identifier in format '{type}-{entityId}'"),
+  type: zod.enum(["milestone", "compliance", "invoice", "overdue"]),
+  title: zod.string(),
+  date: zod.string().describe("YYYY-MM-DD"),
+  status: zod.string(),
+  entityId: zod.number(),
+  projectId: zod.number().nullish(),
+  projectName: zod.string().nullish(),
+  linkPath: zod
+    .string()
+    .describe(
+      "Frontend route to the full record, e.g. \/projects\/1 or \/invoices\/3",
+    ),
+});
+export const ListCalendarEventsResponse = zod.array(
+  ListCalendarEventsResponseItem,
+);

@@ -1034,6 +1034,33 @@ export interface AuditLog {
   actor?: AuditLogActor | null;
 }
 
+export type CalendarEventType =
+  (typeof CalendarEventType)[keyof typeof CalendarEventType];
+
+export const CalendarEventType = {
+  milestone: "milestone",
+  compliance: "compliance",
+  invoice: "invoice",
+  overdue: "overdue",
+} as const;
+
+export interface CalendarEvent {
+  /** Unique identifier in format '{type}-{entityId}' */
+  id: string;
+  type: CalendarEventType;
+  title: string;
+  /** YYYY-MM-DD */
+  date: string;
+  status: string;
+  entityId: number;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  projectName?: string | null;
+  /** Frontend route to the full record, e.g. /projects/1 or /invoices/3 */
+  linkPath: string;
+}
+
 export type GetProjectBillingSummaryParams = {
   /**
    * YYYY-MM format, defaults to current month
@@ -1139,3 +1166,14 @@ export const ExportReportType = {
   "project-profitability": "project-profitability",
   "time-summary": "time-summary",
 } as const;
+
+export type ListCalendarEventsParams = {
+  /**
+   * Start date YYYY-MM-DD (inclusive)
+   */
+  start: string;
+  /**
+   * End date YYYY-MM-DD (inclusive)
+   */
+  end: string;
+};

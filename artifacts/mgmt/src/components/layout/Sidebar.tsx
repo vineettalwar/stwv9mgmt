@@ -18,6 +18,7 @@ import {
   GitCommitHorizontal,
   ScrollText,
   BarChart3,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClerk } from "@clerk/react";
@@ -138,6 +139,13 @@ const navigation: NavItem[] = [
     icon: ScrollText,
     testId: "nav-audit-log",
     allowedRoles: ["admin"],
+  },
+  {
+    name: "Calendar",
+    href: "/calendar",
+    icon: CalendarDays,
+    testId: "nav-calendar",
+    allowedRoles: ["admin", "germany_accountant", "india_accountant", "project_manager", "freelancer"],
   },
   {
     name: "Reports",
