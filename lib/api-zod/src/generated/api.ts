@@ -1846,6 +1846,13 @@ export const DeleteInvoiceParams = zod.object({
 });
 
 /**
+ * @summary Download invoice as PDF
+ */
+export const GetInvoicePdfParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary Export Indian invoices in Tally XML/CSV format
  */
 export const ExportTallyQueryParams = zod.object({

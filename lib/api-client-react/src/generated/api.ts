@@ -5398,6 +5398,93 @@ export const useDeleteInvoice = <
 };
 
 /**
+ * @summary Download invoice as PDF
+ */
+export const getGetInvoicePdfUrl = (id: number) => {
+  return `/api/invoices/${id}/pdf`;
+};
+
+export const getInvoicePdf = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetInvoicePdfUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetInvoicePdfQueryKey = (id: number) => {
+  return [`/api/invoices/${id}/pdf`] as const;
+};
+
+export const getGetInvoicePdfQueryOptions = <
+  TData = Awaited<ReturnType<typeof getInvoicePdf>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getInvoicePdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetInvoicePdfQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getInvoicePdf>>> = ({
+    signal,
+  }) => getInvoicePdf(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getInvoicePdf>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetInvoicePdfQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getInvoicePdf>>
+>;
+export type GetInvoicePdfQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Download invoice as PDF
+ */
+
+export function useGetInvoicePdf<
+  TData = Awaited<ReturnType<typeof getInvoicePdf>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getInvoicePdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetInvoicePdfQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary Export German invoices in DATEV CSV format
  */
 export const getExportDatevUrl = () => {
