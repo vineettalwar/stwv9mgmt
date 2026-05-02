@@ -8,6 +8,13 @@
       "when": 1777753266078,
       "tag": "0000_confused_naoko",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777760000000,
+      "tag": "0001_add_expenses",
+      "breakpoints": true
     }
   ]
 }

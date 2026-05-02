@@ -750,6 +750,9 @@ export interface ProjectProfitabilityRow {
   totalInvoiced: string;
   totalHours: string;
   totalCost: string;
+  totalExpenseCost: string;
+  billableExpenseCost: string;
+  internalExpenseCost: string;
   margin: string;
 }
 

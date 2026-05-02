@@ -3612,9 +3612,15 @@ components:
           type: string
         totalCost:
           type: string
+        totalExpenseCost:
+          type: string
+        billableExpenseCost:
+          type: string
+        internalExpenseCost:
+          type: string
         margin:
           type: string
-      required: [projectId, projectName, status, companyId, companyName, currency, totalInvoiced, totalHours, totalCost, margin]
+      required: [projectId, projectName, status, companyId, companyName, currency, totalInvoiced, totalHours, totalCost, totalExpenseCost, billableExpenseCost, internalExpenseCost, margin]
 
     ProjectProfitabilityReport:
       type: object

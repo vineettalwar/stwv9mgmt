@@ -135,6 +135,7 @@ function CreateInvoiceDialog({ onCreated }: { onCreated: () => void }) {
   const [lineItems, setLineItems] = useState<LineItem[]>([{ description: "", quantity: "1", unitPrice: "0" }]);
   const [selectedTimeEntries, setSelectedTimeEntries] = useState<number[]>([]);
   const [selectedExpenseIds, setSelectedExpenseIds] = useState<number[]>([]);
+  const [importedExpenseIds, setImportedExpenseIds] = useState<number[]>([]);
   const { toast } = useToast();
   const { data: companies } = useListCompanies();
   const { data: users } = useListUsers();
@@ -156,6 +157,7 @@ function CreateInvoiceDialog({ onCreated }: { onCreated: () => void }) {
         toast({ title: "Invoice created" });
         setOpen(false);
         setSelectedExpenseIds([]);
+        setImportedExpenseIds([]);
         onCreated();
       },
       onError: (e: unknown) => toast({ title: "Error", description: String(e), variant: "destructive" }),
@@ -191,6 +193,8 @@ function CreateInvoiceDialog({ onCreated }: { onCreated: () => void }) {
       const filtered = prev.filter(li => li.description.trim() || parseFloat(li.unitPrice) > 0);
       return [...filtered, ...newItems];
     });
+    setImportedExpenseIds(prev => [...new Set([...prev, ...selectedExpenseIds])]);
+    setSelectedExpenseIds([]);
     toast({ title: `${newItems.length} expense${newItems.length !== 1 ? "s" : ""} imported as line items` });
   }
 
@@ -234,7 +238,7 @@ function CreateInvoiceDialog({ onCreated }: { onCreated: () => void }) {
         isRecurring: form.isRecurring,
         recurringInterval: form.isRecurring ? form.recurringInterval : null,
         lineItems: lineItems.filter(li => li.description.trim()),
-        expenseIds: selectedExpenseIds.length > 0 ? selectedExpenseIds : undefined,
+        expenseIds: importedExpenseIds.length > 0 ? importedExpenseIds : undefined,
       },
     });
   }

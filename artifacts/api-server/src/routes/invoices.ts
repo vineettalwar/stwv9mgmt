@@ -238,9 +238,30 @@ router.post("/invoices", requireAuth, loadDbUser, async (req, res): Promise<void
   }
 
   if (expenseIds.length > 0) {
-    await db.update(expensesTable)
-      .set({ invoicedAt: new Date() })
-      .where(inArray(expensesTable.id, expenseIds));
+    if (!invoiceData.projectId) {
+      res.status(400).json({ error: "projectId is required when expenseIds are provided" });
+      return;
+    }
+    const validExpenses = await db.select({ id: expensesTable.id })
+      .from(expensesTable)
+      .where(
+        and(
+          inArray(expensesTable.id, expenseIds),
+          eq(expensesTable.projectId, invoiceData.projectId),
+          eq(expensesTable.isBillable, true),
+        )
+      );
+    const validIds = validExpenses.map(e => e.id);
+    const invalidIds = expenseIds.filter(id => !validIds.includes(id));
+    if (invalidIds.length > 0) {
+      res.status(400).json({ error: `Invalid expenseIds: ${invalidIds.join(", ")} — must belong to project, be billable, and not yet invoiced` });
+      return;
+    }
+    if (validIds.length > 0) {
+      await db.update(expensesTable)
+        .set({ invoicedAt: new Date() })
+        .where(inArray(expensesTable.id, validIds));
+    }
   }
 
   const full = await getInvoiceWithDetails(invoice.id);
