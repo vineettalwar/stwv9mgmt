@@ -50,6 +50,10 @@ const ACTION_LABELS: Record<string, string> = {
   signed: "Signed",
   filed: "Filed",
   role_changed: "Role Changed",
+  sent: "Sent",
+  accepted: "Accepted",
+  archived: "Archived",
+  created: "Created",
 };
 
 const ENTITY_TYPE_LABELS: Record<string, string> = {
@@ -66,6 +70,10 @@ const ACTION_BADGE_COLORS: Record<string, string> = {
   signed: "bg-emerald-100 text-emerald-800",
   filed: "bg-purple-100 text-purple-800",
   role_changed: "bg-amber-100 text-amber-800",
+  sent: "bg-sky-100 text-sky-800",
+  accepted: "bg-emerald-100 text-emerald-800",
+  archived: "bg-slate-200 text-slate-600",
+  created: "bg-teal-100 text-teal-800",
 };
 
 const ENTITY_TYPE_COLORS: Record<string, string> = {

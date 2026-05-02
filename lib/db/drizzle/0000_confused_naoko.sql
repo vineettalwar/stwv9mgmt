@@ -32,3 +32,5 @@ CREATE INDEX IF NOT EXISTS "audit_logs_entity_idx" ON "audit_logs" ("entity_type
 CREATE INDEX IF NOT EXISTS "audit_logs_project_idx" ON "audit_logs" ("project_id");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "audit_logs_created_at_idx" ON "audit_logs" ("created_at");
+--> statement-breakpoint
+ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "archived_at" timestamp with time zone;

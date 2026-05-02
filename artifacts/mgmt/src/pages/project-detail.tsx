@@ -96,6 +96,10 @@ const ACTION_LABELS: Record<string, string> = {
   signed: "Signed",
   filed: "Filed",
   role_changed: "Role Changed",
+  sent: "Sent",
+  accepted: "Accepted",
+  archived: "Archived",
+  created: "Created",
 };
 
 const ENTITY_TYPE_COLORS: Record<string, string> = {
