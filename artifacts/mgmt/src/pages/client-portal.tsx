@@ -1,8 +1,11 @@
-import { useGetMe, useListProjects, useListDeliverables } from "@workspace/api-client-react";
+import { useState } from "react";
+import { useGetMe, useListProjects, useListDeliverables, useListInvoices } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, FileText, FolderOpen, CheckCircle2, Circle, Clock, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { Building2, Download, FileText, FolderOpen, CheckCircle2, Circle, Clock, User } from "lucide-react";
 
 const TYPE_LABELS: Record<string, string> = {
   one_time: "One-Time",
@@ -83,9 +86,20 @@ function ClientProjectCard({ project }: { project: { id: number; name: string; t
   );
 }
 
+const STATUS_INVOICE_STYLES: Record<string, { label: string; className: string }> = {
+  draft:     { label: "Draft",     className: "bg-slate-100 text-slate-600" },
+  sent:      { label: "Sent",      className: "bg-blue-100 text-blue-700" },
+  paid:      { label: "Paid",      className: "bg-emerald-100 text-emerald-800" },
+  overdue:   { label: "Overdue",   className: "bg-red-100 text-red-700" },
+  cancelled: { label: "Cancelled", className: "bg-slate-100 text-slate-400" },
+};
+
 export default function ClientPortal() {
+  const { toast } = useToast();
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const { data: me, isLoading: meLoading } = useGetMe();
   const { data: projects, isLoading: projectsLoading } = useListProjects();
+  const { data: invoices, isLoading: invoicesLoading } = useListInvoices();
 
   const assignedCompanies = me?.companies ?? [];
 
@@ -222,14 +236,74 @@ export default function ClientPortal() {
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2">
-            <FileText className="h-4 w-4" /> Invoices
+            <FileText className="h-4 w-4" /> Your Invoices
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-slate-400">
-            <FileText className="h-10 w-10 mx-auto mb-2 opacity-30" />
-            <p className="text-sm">Invoice management is coming in the next update.</p>
-          </div>
+          {invoicesLoading ? (
+            <div className="space-y-2">{[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+          ) : (invoices ?? []).length === 0 ? (
+            <div className="text-center py-8 text-slate-400">
+              <FileText className="h-10 w-10 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No invoices issued to you yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {[...(invoices ?? [])].sort((a, b) => b.issueDate.localeCompare(a.issueDate)).map(inv => {
+                const info = STATUS_INVOICE_STYLES[inv.status] ?? { label: inv.status, className: "bg-slate-100 text-slate-600" };
+                return (
+                  <div
+                    key={inv.id}
+                    data-testid={`client-invoice-${inv.id}`}
+                    className="flex items-center justify-between py-2 px-3 rounded-md border border-slate-100 bg-slate-50"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">{inv.invoiceNumber}</p>
+                      <p className="text-xs text-slate-500">{inv.title} · {inv.issueDate}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-slate-700">
+                        {inv.currency} {parseFloat(inv.totalAmount).toFixed(2)}
+                      </span>
+                      <Badge variant="secondary" className={info.className}>{info.label}</Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={downloadingId === inv.id}
+                        data-testid={`button-client-download-pdf-${inv.id}`}
+                        onClick={async () => {
+                          setDownloadingId(inv.id);
+                          try {
+                            const { getToken } = (window as unknown as { __clerk?: { session?: { getToken: () => Promise<string> } } }).__clerk?.session ?? {};
+                            const token = getToken ? await getToken() : null;
+                            const res = await fetch(`/api/invoices/${inv.id}/pdf`, {
+                              headers: token ? { Authorization: `Bearer ${token}` } : {},
+                            });
+                            if (!res.ok) throw new Error("Download failed");
+                            const blob = await res.blob();
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = `invoice-${inv.invoiceNumber}.pdf`;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                            toast({ title: "PDF downloaded" });
+                          } catch {
+                            toast({ title: "PDF download failed", variant: "destructive" });
+                          } finally {
+                            setDownloadingId(null);
+                          }
+                        }}
+                      >
+                        <Download className="h-3.5 w-3.5 mr-1" />
+                        {downloadingId === inv.id ? "…" : "PDF"}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

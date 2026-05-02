@@ -139,7 +139,9 @@ async function getInvoiceWithDetails(invoiceId: number) {
 // LIST invoices
 router.get("/invoices", requireAuth, loadDbUser, async (req, res): Promise<void> => {
   const user = req.dbUser!;
-  if (!ADMIN_PM_ACCT.includes(user.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const isStaff = ADMIN_PM_ACCT.includes(user.role);
+  const isClient = user.role === "client";
+  if (!isStaff && !isClient) { res.status(403).json({ error: "Forbidden" }); return; }
 
   const statusFilter = req.query.status as string | undefined;
   const companyFilter = req.query.companyId ? parseInt(String(req.query.companyId)) : undefined;
@@ -147,8 +149,10 @@ router.get("/invoices", requireAuth, loadDbUser, async (req, res): Promise<void>
   let query = db.select().from(invoicesTable);
   const conditions = [];
 
+  // Clients can only see invoices addressed to them
+  if (isClient) conditions.push(eq(invoicesTable.clientId, user.id));
   if (statusFilter) conditions.push(eq(invoicesTable.status, statusFilter));
-  if (companyFilter) conditions.push(eq(invoicesTable.companyId, companyFilter));
+  if (companyFilter && isStaff) conditions.push(eq(invoicesTable.companyId, companyFilter));
 
   const rows = conditions.length > 0
     ? await query.where(and(...conditions)).orderBy(invoicesTable.id)
@@ -228,12 +232,16 @@ router.get("/invoices/:id", requireAuth, loadDbUser, async (req, res): Promise<v
 // PDF export — server-side generated PDF for a single invoice
 router.get("/invoices/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise<void> => {
   const user = req.dbUser!;
-  if (!ADMIN_PM_ACCT.includes(user.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const isStaff = ADMIN_PM_ACCT.includes(user.role);
+  const isClient = user.role === "client";
+  if (!isStaff && !isClient) { res.status(403).json({ error: "Forbidden" }); return; }
   const id = parseInt(String(req.params.id));
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const invoiceRaw = await getInvoiceWithDetails(id);
   if (!invoiceRaw) { res.status(404).json({ error: "Not found" }); return; }
+  // Clients can only download their own invoices
+  if (isClient && invoiceRaw.clientId !== user.id) { res.status(403).json({ error: "Forbidden" }); return; }
   const invoice = invoiceRaw;
 
   const TAX_LABELS: Record<string, string> = {
