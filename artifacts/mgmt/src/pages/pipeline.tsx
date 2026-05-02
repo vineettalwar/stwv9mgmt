@@ -41,6 +41,8 @@ import {
   Building2,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
+  ChevronRight,
 } from "lucide-react";
 
 const OFFER_STATUS: Record<string, { label: string; cls: string }> = {
@@ -68,7 +70,7 @@ const INVOICE_STATUS: Record<string, { label: string; cls: string }> = {
 
 function statusBadge(map: Record<string, { label: string; cls: string }>, status: string) {
   const s = map[status] ?? { label: status, cls: "bg-slate-100 text-slate-600" };
-  return <Badge className={`text-xs font-medium ${s.cls}`}>{s.label}</Badge>;
+  return <Badge className={`text-xs font-medium ${s.cls} border-0`}>{s.label}</Badge>;
 }
 
 function fmtAmount(amount: string, currency: string) {
@@ -84,43 +86,92 @@ type PipelineGroup = {
   invoices: Invoice[];
 };
 
+// Compact inline related-document link
+function RelatedLink({ icon: Icon, label, href }: { icon: React.ElementType; label: string; href: string }) {
+  return (
+    <Link href={href}>
+      <span className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-mono">
+        <Icon className="h-3 w-3 flex-shrink-0" />
+        {label}
+        <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+      </span>
+    </Link>
+  );
+}
+
 function OfferCard({
   offer,
-  linkedContract,
+  linkedContracts,
+  relatedInvoices,
   onConvert,
   converting,
   onDownload,
 }: {
   offer: Offer;
-  linkedContract: Contract | undefined;
+  linkedContracts: Contract[];
+  relatedInvoices: Invoice[];
   onConvert: (offerId: number) => void;
   converting: boolean;
   onDownload: (type: "offer", id: number, number: string) => void;
 }) {
-  const canConvert = (offer.status === "accepted" || offer.status === "sent") && !linkedContract;
+  const [expanded, setExpanded] = useState(false);
+  const canConvert = (offer.status === "accepted" || offer.status === "sent") && linkedContracts.length === 0;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <FileText className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-            <span className="text-xs font-mono text-slate-500">{offer.offerNumber}</span>
+    <div className="rounded-lg border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+      {/* Clickable header */}
+      <button
+        className="w-full text-left p-3 pb-2"
+        onClick={() => setExpanded(e => !e)}
+      >
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <FileText className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+              <span className="text-xs font-mono text-slate-500">{offer.offerNumber}</span>
+              {expanded ? <ChevronUp className="h-3 w-3 text-slate-300" /> : <ChevronRight className="h-3 w-3 text-slate-300" />}
+            </div>
+            <p className="text-sm font-medium text-slate-800 leading-tight line-clamp-2">{offer.title}</p>
           </div>
-          <p className="text-sm font-medium text-slate-800 leading-tight line-clamp-2">{offer.title}</p>
+          {statusBadge(OFFER_STATUS, offer.status)}
         </div>
-        {statusBadge(OFFER_STATUS, offer.status)}
-      </div>
-      <p className="text-sm font-semibold text-slate-700 mt-1.5 mb-2">
-        {fmtAmount(offer.totalAmount, offer.currency)}
-      </p>
-      {linkedContract && (
-        <div className="flex items-center gap-1 text-xs text-emerald-600 mb-2">
-          <ArrowRight className="h-3 w-3" />
-          <span>→ {linkedContract.contractNumber}</span>
+        <p className="text-sm font-semibold text-slate-700 mt-1">
+          {fmtAmount(offer.totalAmount, offer.currency)}
+        </p>
+      </button>
+
+      {/* Expanded: related documents */}
+      {expanded && (
+        <div className="px-3 pb-2 border-t border-slate-100 pt-2 space-y-1.5">
+          {linkedContracts.length > 0 && (
+            <div>
+              <span className="text-xs text-slate-400 block mb-0.5">Contracts</span>
+              {linkedContracts.map(c => (
+                <RelatedLink key={c.id} icon={FileSignature} label={c.contractNumber} href="/contracts" />
+              ))}
+            </div>
+          )}
+          {relatedInvoices.length > 0 && (
+            <div>
+              <span className="text-xs text-slate-400 block mb-0.5">Invoices</span>
+              {relatedInvoices.map(inv => (
+                <RelatedLink key={inv.id} icon={Receipt} label={inv.invoiceNumber} href={`/invoices/${inv.id}`} />
+              ))}
+            </div>
+          )}
+          {linkedContracts.length === 0 && relatedInvoices.length === 0 && (
+            <p className="text-xs text-slate-400 italic">No related documents yet</p>
+          )}
         </div>
       )}
-      <div className="flex flex-wrap gap-1.5">
+
+      {/* Actions */}
+      <div className="px-3 pb-3 flex flex-wrap gap-1.5">
+        <Link href="/offers">
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-slate-500 hover:text-slate-800">
+            <ExternalLink className="h-3 w-3 mr-1" /> View
+          </Button>
+        </Link>
         <Button
           variant="ghost"
           size="sm"
@@ -148,36 +199,74 @@ function OfferCard({
 function ContractCard({
   contract,
   sourceOffer,
+  relatedInvoices,
   onDownload,
 }: {
   contract: Contract;
   sourceOffer: Offer | undefined;
+  relatedInvoices: Invoice[];
   onDownload: (type: "contract", id: number, number: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <FileSignature className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-            <span className="text-xs font-mono text-slate-500">{contract.contractNumber}</span>
+    <div className="rounded-lg border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+      {/* Clickable header */}
+      <button
+        className="w-full text-left p-3 pb-2"
+        onClick={() => setExpanded(e => !e)}
+      >
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <FileSignature className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+              <span className="text-xs font-mono text-slate-500">{contract.contractNumber}</span>
+              {expanded ? <ChevronUp className="h-3 w-3 text-slate-300" /> : <ChevronRight className="h-3 w-3 text-slate-300" />}
+            </div>
+            <p className="text-sm font-medium text-slate-800 leading-tight line-clamp-2">{contract.title}</p>
           </div>
-          <p className="text-sm font-medium text-slate-800 leading-tight line-clamp-2">{contract.title}</p>
+          {statusBadge(CONTRACT_STATUS, contract.status)}
         </div>
-        {statusBadge(CONTRACT_STATUS, contract.status)}
-      </div>
-      {sourceOffer && (
-        <div className="flex items-center gap-1 text-xs text-slate-500 mt-1 mb-1">
-          <span className="text-slate-400">from</span>
-          <span className="font-mono">{sourceOffer.offerNumber}</span>
+        {contract.startDate && (
+          <p className="text-xs text-slate-400 mt-0.5">
+            {contract.startDate}{contract.endDate ? ` → ${contract.endDate}` : ""}
+          </p>
+        )}
+      </button>
+
+      {/* Expanded: related documents */}
+      {expanded && (
+        <div className="px-3 pb-2 border-t border-slate-100 pt-2 space-y-1.5">
+          {sourceOffer && (
+            <div>
+              <span className="text-xs text-slate-400 block mb-0.5">Source offer</span>
+              <RelatedLink icon={FileText} label={`${sourceOffer.offerNumber} — ${sourceOffer.title}`} href="/offers" />
+            </div>
+          )}
+          {relatedInvoices.length > 0 && (
+            <div>
+              <span className="text-xs text-slate-400 block mb-0.5">Invoices in this project</span>
+              {relatedInvoices.map(inv => (
+                <div key={inv.id} className="flex items-center justify-between">
+                  <RelatedLink icon={Receipt} label={inv.invoiceNumber} href={`/invoices/${inv.id}`} />
+                  <span className="text-xs text-slate-500">{fmtAmount(inv.totalAmount, inv.currency)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {!sourceOffer && relatedInvoices.length === 0 && (
+            <p className="text-xs text-slate-400 italic">No related documents</p>
+          )}
         </div>
       )}
-      {contract.startDate && (
-        <p className="text-xs text-slate-400 mt-1">
-          {contract.startDate}{contract.endDate ? ` → ${contract.endDate}` : ""}
-        </p>
-      )}
-      <div className="flex flex-wrap gap-1.5 mt-2">
+
+      {/* Actions */}
+      <div className="px-3 pb-3 flex flex-wrap gap-1.5">
+        <Link href="/contracts">
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-slate-500 hover:text-slate-800">
+            <ExternalLink className="h-3 w-3 mr-1" /> View
+          </Button>
+        </Link>
         <Button
           variant="ghost"
           size="sm"
@@ -193,33 +282,78 @@ function ContractCard({
 
 function InvoiceCard({
   invoice,
+  relatedContracts,
+  project,
   onDownload,
 }: {
   invoice: Invoice;
+  relatedContracts: Contract[];
+  project: Project | null;
   onDownload: (type: "invoice", id: number, number: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const isOverdue = invoice.status === "overdue";
+
   return (
-    <div className={`rounded-lg border bg-white p-3 shadow-sm hover:shadow-md transition-shadow ${isOverdue ? "border-red-300" : "border-slate-200"}`}>
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <Receipt className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-            <span className="text-xs font-mono text-slate-500">{invoice.invoiceNumber}</span>
+    <div className={`rounded-lg border bg-white shadow-sm hover:shadow-md transition-shadow ${isOverdue ? "border-red-300" : "border-slate-200"}`}>
+      {/* Clickable header → /invoices/:id */}
+      <Link href={`/invoices/${invoice.id}`}>
+        <div className="p-3 pb-2 cursor-pointer">
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Receipt className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                <span className="text-xs font-mono text-slate-500 hover:underline">{invoice.invoiceNumber}</span>
+                <ExternalLink className="h-2.5 w-2.5 text-slate-300" />
+              </div>
+              <p className="text-sm font-medium text-slate-800 leading-tight line-clamp-2 hover:text-blue-700">{invoice.title}</p>
+            </div>
+            {statusBadge(INVOICE_STATUS, invoice.status)}
           </div>
-          <p className="text-sm font-medium text-slate-800 leading-tight line-clamp-2">{invoice.title}</p>
+          <p className="text-sm font-semibold text-slate-700 mt-1">
+            {fmtAmount(invoice.totalAmount, invoice.currency)}
+          </p>
+          {invoice.dueDate && (
+            <p className={`text-xs mt-0.5 ${isOverdue ? "text-red-500 font-medium" : "text-slate-400"}`}>
+              Due {invoice.dueDate}
+            </p>
+          )}
         </div>
-        {statusBadge(INVOICE_STATUS, invoice.status)}
-      </div>
-      <p className="text-sm font-semibold text-slate-700 mt-1.5">
-        {fmtAmount(invoice.totalAmount, invoice.currency)}
-      </p>
-      {invoice.dueDate && (
-        <p className={`text-xs mt-0.5 ${isOverdue ? "text-red-500 font-medium" : "text-slate-400"}`}>
-          Due {invoice.dueDate}
-        </p>
+      </Link>
+
+      {/* Related documents toggle */}
+      <button
+        className="w-full px-3 py-1.5 border-t border-slate-100 flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600"
+        onClick={() => setExpanded(e => !e)}
+      >
+        {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        Related documents
+      </button>
+
+      {expanded && (
+        <div className="px-3 pb-2 space-y-1.5">
+          {project && (
+            <div>
+              <span className="text-xs text-slate-400 block mb-0.5">Project</span>
+              <RelatedLink icon={FolderOpen} label={project.name} href={`/projects/${project.id}`} />
+            </div>
+          )}
+          {relatedContracts.length > 0 && (
+            <div>
+              <span className="text-xs text-slate-400 block mb-0.5">Contracts</span>
+              {relatedContracts.map(c => (
+                <RelatedLink key={c.id} icon={FileSignature} label={`${c.contractNumber} (${c.status})`} href="/contracts" />
+              ))}
+            </div>
+          )}
+          {!project && relatedContracts.length === 0 && (
+            <p className="text-xs text-slate-400 italic">No related documents</p>
+          )}
+        </div>
       )}
-      <div className="flex flex-wrap gap-1.5 mt-2">
+
+      {/* Actions */}
+      <div className="px-3 pb-3 flex flex-wrap gap-1.5">
         <Button
           variant="ghost"
           size="sm"
@@ -228,11 +362,6 @@ function InvoiceCard({
         >
           <Download className="h-3 w-3 mr-1" /> PDF
         </Button>
-        <Link href={`/invoices/${invoice.id}`}>
-          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-slate-500 hover:text-slate-800">
-            View
-          </Button>
-        </Link>
       </div>
     </div>
   );
@@ -279,18 +408,40 @@ function PipelineGroupCard({ group, onConvert, convertingId, onDownload }: {
   const invoiceTotal = group.invoices.reduce((sum, inv) => sum + parseFloat(inv.totalAmount), 0);
   const invoiceCurrency = group.invoices[0]?.currency ?? "";
 
-  const contractByOfferId = new Map(group.contracts.filter(c => c.offerId).map(c => [c.offerId!, c]));
+  const contractByOfferId = new Map(
+    group.contracts.filter(c => c.offerId != null).map(c => [c.offerId!, c])
+  );
+  const contractsByOfferId = useMemo(() => {
+    const m = new Map<number, Contract[]>();
+    for (const c of group.contracts) {
+      if (c.offerId != null) {
+        if (!m.has(c.offerId)) m.set(c.offerId, []);
+        m.get(c.offerId)!.push(c);
+      }
+    }
+    return m;
+  }, [group.contracts]);
   const offerById = new Map(group.offers.map(o => [o.id, o]));
 
   return (
     <Card className="border border-slate-200 shadow-sm">
-      <CardHeader className="py-3 px-4 cursor-pointer select-none" onClick={() => setCollapsed(c => !c)}>
+      <CardHeader
+        className="py-3 px-4 cursor-pointer select-none"
+        onClick={() => setCollapsed(c => !c)}
+      >
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <FolderOpen className="h-4 w-4 text-slate-400 flex-shrink-0" />
             <span className="font-semibold text-slate-800 truncate">
               {group.project?.name ?? "No Project"}
             </span>
+            {group.project && (
+              <Link href={`/projects/${group.project.id}`} onClick={e => e.stopPropagation()}>
+                <span className="text-xs text-blue-500 hover:underline flex-shrink-0">
+                  <ExternalLink className="h-3 w-3 inline" />
+                </span>
+              </Link>
+            )}
             {group.company && (
               <span className="flex items-center gap-1 text-xs text-slate-500 flex-shrink-0">
                 <Building2 className="h-3 w-3" />
@@ -322,7 +473,8 @@ function PipelineGroupCard({ group, onConvert, convertingId, onDownload }: {
                 <OfferCard
                   key={offer.id}
                   offer={offer}
-                  linkedContract={contractByOfferId.get(offer.id)}
+                  linkedContracts={contractsByOfferId.get(offer.id) ?? []}
+                  relatedInvoices={group.invoices}
                   onConvert={onConvert}
                   converting={convertingId === offer.id}
                   onDownload={onDownload}
@@ -339,7 +491,8 @@ function PipelineGroupCard({ group, onConvert, convertingId, onDownload }: {
                 <ContractCard
                   key={contract.id}
                   contract={contract}
-                  sourceOffer={contract.offerId ? offerById.get(contract.offerId) : undefined}
+                  sourceOffer={contract.offerId != null ? offerById.get(contract.offerId) : undefined}
+                  relatedInvoices={group.invoices}
                   onDownload={onDownload}
                 />
               ))}
@@ -354,6 +507,8 @@ function PipelineGroupCard({ group, onConvert, convertingId, onDownload }: {
                 <InvoiceCard
                   key={invoice.id}
                   invoice={invoice}
+                  relatedContracts={group.contracts}
+                  project={group.project}
                   onDownload={onDownload}
                 />
               ))}
@@ -393,7 +548,6 @@ export default function Pipeline() {
     () => new Map(companies.map(c => [c.id, c])),
     [companies]
   );
-
   const projectMap = useMemo(
     () => new Map(projects.map(p => [p.id, p])),
     [projects]
@@ -481,7 +635,9 @@ export default function Pipeline() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Pipeline</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Offer → Contract → Invoice lifecycle per project</p>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Offer → Contract → Invoice lifecycle per project. Click any card to see related documents.
+          </p>
         </div>
         <Button variant="outline" size="sm" onClick={handleRefresh}>
           <RefreshCw className="h-4 w-4 mr-2" /> Refresh
