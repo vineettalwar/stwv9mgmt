@@ -50,7 +50,6 @@ import {
   RefreshCw,
   Plus,
 } from "lucide-react";
-import { generateInvoicePdf } from "@/lib/pdf-generator";
 
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-slate-100 text-slate-600" },
@@ -227,10 +226,26 @@ export default function InvoiceDetail() {
     updateInvoice({ id, data: { status } });
   }
 
-  function handleDownloadPdf() {
+  async function handleDownloadPdf() {
     if (!inv) return;
-    generateInvoicePdf(inv as unknown as Parameters<typeof generateInvoicePdf>[0]);
-    toast({ title: "PDF generated" });
+    try {
+      const { getToken } = (window as unknown as { __clerk?: { session?: { getToken: () => Promise<string> } } }).__clerk?.session ?? {};
+      const token = getToken ? await getToken() : null;
+      const res = await fetch(`/api/invoices/${inv.id}/pdf`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("PDF generation failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `invoice-${inv.invoiceNumber}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "PDF downloaded" });
+    } catch {
+      toast({ title: "PDF download failed", variant: "destructive" });
+    }
   }
 
   if (isLoading) {
