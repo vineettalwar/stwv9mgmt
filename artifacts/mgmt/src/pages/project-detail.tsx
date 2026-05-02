@@ -651,16 +651,33 @@ function BillingTab({ projectId, projectType }: { projectId: number; projectType
 // ─── Activity Tab ─────────────────────────────────────────────────────────────
 
 function ActivityTab({ projectId }: { projectId: number }) {
-  const { data: entries, isLoading } = useQuery<AuditLogEntry[]>({
+  const { data: entries, isLoading, error } = useQuery<AuditLogEntry[]>({
     queryKey: ["project-activity", projectId],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/projects/${projectId}/activity`, { credentials: "include" });
+      if (res.status === 403) throw Object.assign(new Error("Forbidden"), { status: 403 });
       if (!res.ok) throw new Error("Failed to load activity");
       return res.json();
     },
   });
 
   if (isLoading) return <Skeleton className="h-40 w-full" />;
+
+  if (error && (error as Error & { status?: number }).status === 403) {
+    return (
+      <div className="text-center py-12 text-sm text-slate-400">
+        You do not have permission to view this project's activity.
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12 text-sm text-red-400">
+        Failed to load activity. Please try again.
+      </div>
+    );
+  }
 
   if (!entries || entries.length === 0) {
     return (

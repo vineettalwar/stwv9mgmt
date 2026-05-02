@@ -177,28 +177,31 @@ router.patch("/projects/:id", requireAuth, loadDbUser, async (req, res): Promise
   const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
   if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
 
-  const [project] = await db
-    .update(projectsTable)
-    .set({ ...parsed.data, updatedAt: new Date() })
-    .where(eq(projectsTable.id, id))
-    .returning();
-  if (!project) { res.status(404).json({ error: "Project not found" }); return; }
+  let project: typeof projectsTable.$inferSelect;
+  await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(projectsTable)
+      .set({ ...parsed.data, updatedAt: new Date() })
+      .where(eq(projectsTable.id, id))
+      .returning();
+    if (!updated) throw Object.assign(new Error("Project not found"), { status: 404 });
+    project = updated;
+    if (parsed.data.status && parsed.data.status !== existing.status) {
+      await logAuditTx(tx, {
+        actorId: user.id,
+        actorRole: user.role,
+        action: "status_changed",
+        entityType: "project",
+        entityId: id,
+        entityLabel: existing.name,
+        oldValue: { status: existing.status },
+        newValue: { status: parsed.data.status },
+        projectId: id,
+      });
+    }
+  });
 
-  if (parsed.data.status && parsed.data.status !== existing.status) {
-    await logAudit({
-      actorId: user.id,
-      actorRole: user.role,
-      action: "status_changed",
-      entityType: "project",
-      entityId: id,
-      entityLabel: existing.name,
-      oldValue: { status: existing.status },
-      newValue: { status: parsed.data.status },
-      projectId: id,
-    });
-  }
-
-  const full = await getProjectWithDetails(project.id);
+  const full = await getProjectWithDetails(project!.id);
   res.json(full);
 });
 

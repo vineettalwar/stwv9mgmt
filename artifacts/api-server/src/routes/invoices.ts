@@ -506,21 +506,22 @@ router.patch("/invoices/:id", requireAuth, loadDbUser, async (req, res): Promise
     }
   }
 
-  await db.update(invoicesTable).set({ ...invoiceData, ...totals, updatedAt: new Date() }).where(eq(invoicesTable.id, id));
-
-  if (invoiceData.status && invoiceData.status !== existing.status) {
-    await logAudit({
-      actorId: user.id,
-      actorRole: user.role,
-      action: "status_changed",
-      entityType: "invoice",
-      entityId: id,
-      entityLabel: existing.invoiceNumber,
-      oldValue: { status: existing.status },
-      newValue: { status: invoiceData.status },
-      projectId: existing.projectId ?? null,
-    });
-  }
+  await db.transaction(async (tx) => {
+    await tx.update(invoicesTable).set({ ...invoiceData, ...totals, updatedAt: new Date() }).where(eq(invoicesTable.id, id));
+    if (invoiceData.status && invoiceData.status !== existing.status) {
+      await logAuditTx(tx, {
+        actorId: user.id,
+        actorRole: user.role,
+        action: "status_changed",
+        entityType: "invoice",
+        entityId: id,
+        entityLabel: existing.invoiceNumber,
+        oldValue: { status: existing.status },
+        newValue: { status: invoiceData.status },
+        projectId: existing.projectId ?? null,
+      });
+    }
+  });
 
   const full = await getInvoiceWithDetails(id);
   res.json(full);

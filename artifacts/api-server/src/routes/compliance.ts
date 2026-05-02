@@ -3,7 +3,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { db, complianceChecklistsTable, usersTable } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
-import { logAudit } from "../lib/auditLogger";
+import { logAudit, logAuditTx } from "../lib/auditLogger";
 
 const router: IRouter = Router();
 
@@ -163,27 +163,30 @@ router.patch("/compliance/:id", requireAuth, loadDbUser, async (req, res): Promi
     ...(resolvedFiledAt !== undefined ? { filedAt: resolvedFiledAt } : {}),
   };
 
-  const [item] = await db
-    .update(complianceChecklistsTable)
-    .set(setPayload)
-    .where(eq(complianceChecklistsTable.id, id))
-    .returning();
-  if (!item) { res.status(404).json({ error: "Not found" }); return; }
+  let item: typeof complianceChecklistsTable.$inferSelect | undefined;
+  await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(complianceChecklistsTable)
+      .set(setPayload)
+      .where(eq(complianceChecklistsTable.id, id))
+      .returning();
+    if (!updated) throw Object.assign(new Error("Not found"), { status: 404 });
+    item = updated;
+    if (parsed.data.status && parsed.data.status !== existing.status) {
+      await logAuditTx(tx, {
+        actorId: user.id,
+        actorRole: user.role,
+        action: parsed.data.status === "filed" ? "filed" : "status_changed",
+        entityType: "compliance",
+        entityId: id,
+        entityLabel: existing.itemLabel,
+        oldValue: { status: existing.status },
+        newValue: { status: parsed.data.status },
+      });
+    }
+  });
 
-  if (parsed.data.status && parsed.data.status !== existing.status) {
-    await logAudit({
-      actorId: user.id,
-      actorRole: user.role,
-      action: parsed.data.status === "filed" ? "filed" : "status_changed",
-      entityType: "compliance",
-      entityId: id,
-      entityLabel: existing.itemLabel,
-      oldValue: { status: existing.status },
-      newValue: { status: parsed.data.status },
-    });
-  }
-
-  const full = await getChecklistWithUser(item.id);
+  const full = await getChecklistWithUser(item!.id);
   res.json(full);
 });
 

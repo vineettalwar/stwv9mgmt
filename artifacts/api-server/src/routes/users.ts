@@ -17,7 +17,7 @@ import {
   GetUserCompaniesResponse,
 } from "@workspace/api-zod";
 import { requireAuth, requireAdmin } from "../middlewares/requireRole";
-import { logAudit } from "../lib/auditLogger";
+import { logAudit, logAuditTx } from "../lib/auditLogger";
 import { getAuth, clerkClient } from "@clerk/express";
 
 const router: IRouter = Router();
@@ -176,42 +176,47 @@ router.patch("/users/:id", requireAuth, requireAdmin, async (req, res): Promise<
 
   const [existing] = await db.select().from(usersTable).where(eq(usersTable.id, params.data.id));
 
-  const [user] = await db.update(usersTable)
-    .set({ ...parsed.data, updatedAt: new Date() })
-    .where(eq(usersTable.id, params.data.id))
-    .returning();
-  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+  // Resolve actor before transaction (DB read outside tx is fine; actor is already committed)
+  const auth = getAuth(req);
+  const adminUser = auth?.userId
+    ? await db.select().from(usersTable).where(eq(usersTable.clerkUserId, auth.userId)).then(r => r[0])
+    : null;
 
-  // Sync role to Clerk publicMetadata if the Clerk account is active (not a pending placeholder)
-  if (parsed.data.role && !user.clerkUserId.startsWith("pending:")) {
+  let user: typeof usersTable.$inferSelect;
+  await db.transaction(async (tx) => {
+    const [updated] = await tx.update(usersTable)
+      .set({ ...parsed.data, updatedAt: new Date() })
+      .where(eq(usersTable.id, params.data.id))
+      .returning();
+    if (!updated) throw Object.assign(new Error("User not found"), { status: 404 });
+    user = updated;
+    if (existing && parsed.data.role && parsed.data.role !== existing.role) {
+      await logAuditTx(tx, {
+        actorId: adminUser?.id ?? null,
+        actorRole: adminUser?.role ?? "admin",
+        action: "role_changed",
+        entityType: "user",
+        entityId: updated.id,
+        entityLabel: updated.email,
+        oldValue: { role: existing.role },
+        newValue: { role: parsed.data.role },
+      });
+    }
+  });
+
+  // Best-effort Clerk sync outside transaction (external service; never blocks the DB result)
+  if (parsed.data.role && !user!.clerkUserId.startsWith("pending:")) {
     try {
-      const clerkUser = await clerkClient.users.getUser(user.clerkUserId);
-      await clerkClient.users.updateUser(user.clerkUserId, {
-        publicMetadata: { ...(clerkUser.publicMetadata ?? {}), role: user.role },
+      const clerkUser = await clerkClient.users.getUser(user!.clerkUserId);
+      await clerkClient.users.updateUser(user!.clerkUserId, {
+        publicMetadata: { ...(clerkUser.publicMetadata ?? {}), role: user!.role },
       });
     } catch {
-      // Non-fatal: DB is the primary source of truth; Clerk sync is best-effort
+      // Non-fatal: DB is the primary source of truth
     }
   }
 
-  if (existing && parsed.data.role && parsed.data.role !== existing.role) {
-    const auth = getAuth(req);
-    const adminUser = auth?.userId
-      ? await db.select().from(usersTable).where(eq(usersTable.clerkUserId, auth.userId)).then(r => r[0])
-      : null;
-    await logAudit({
-      actorId: adminUser?.id ?? null,
-      actorRole: adminUser?.role ?? "admin",
-      action: "role_changed",
-      entityType: "user",
-      entityId: user.id,
-      entityLabel: user.email,
-      oldValue: { role: existing.role },
-      newValue: { role: parsed.data.role },
-    });
-  }
-
-  const full = await getUserWithCompanies(user.id);
+  const full = await getUserWithCompanies(user!.id);
   res.json(UpdateUserResponse.parse(full));
 });
 
