@@ -441,6 +441,17 @@ router.post("/offers/:id/send", requireAuth, loadDbUser, async (req, res): Promi
       pdfFilename: `offer-${offer.offerNumber}.pdf`,
     });
     await db.update(offersTable).set({ status: "sent", updatedAt: new Date() }).where(eq(offersTable.id, id));
+    await logAudit({
+      actorId: user.id,
+      actorRole: user.role,
+      action: "status_changed",
+      entityType: "offer",
+      entityId: id,
+      entityLabel: offer.offerNumber,
+      oldValue: { status: offer.status },
+      newValue: { status: "sent" },
+      projectId: offer.projectId ?? null,
+    });
     res.json({ success: true, email: offer.client.email });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -480,6 +491,17 @@ router.post("/offers/:id/convert-to-contract", requireAuth, loadDbUser, async (r
   }).returning();
 
   await db.update(offersTable).set({ status: "accepted", updatedAt: new Date() }).where(eq(offersTable.id, id));
+  await logAudit({
+    actorId: user.id,
+    actorRole: user.role,
+    action: "status_changed",
+    entityType: "offer",
+    entityId: id,
+    entityLabel: offer.offerNumber,
+    oldValue: { status: offer.status },
+    newValue: { status: "accepted" },
+    projectId: offer.projectId ?? null,
+  });
 
   res.status(201).json(contract);
 });

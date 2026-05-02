@@ -121,6 +121,17 @@ router.post("/projects", requireAuth, loadDbUser, async (req, res): Promise<void
     .insert(projectsTable)
     .values(parsed.data)
     .returning();
+  await logAudit({
+    actorId: user.id,
+    actorRole: user.role,
+    action: "status_changed",
+    entityType: "project",
+    entityId: project.id,
+    entityLabel: project.name,
+    oldValue: null,
+    newValue: { status: project.status, name: project.name },
+    projectId: project.id,
+  });
   const full = await getProjectWithDetails(project.id);
   res.status(201).json(full);
 });

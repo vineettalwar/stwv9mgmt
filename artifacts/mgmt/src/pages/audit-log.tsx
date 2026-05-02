@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetMe } from "@workspace/api-client-react";
+import { useGetMe, useListUsers } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -147,18 +147,21 @@ function AuditLogRow({ entry }: { entry: AuditLogEntry }) {
 
 export default function AuditLog() {
   const { data: me, isLoading: meLoading } = useGetMe();
+  const { data: users } = useListUsers();
 
   const [entityType, setEntityType] = useState("all");
   const [action, setAction] = useState("all");
+  const [actorId, setActorId] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [applied, setApplied] = useState<{
-    entityType: string; action: string; dateFrom: string; dateTo: string;
-  }>({ entityType: "all", action: "all", dateFrom: "", dateTo: "" });
+    entityType: string; action: string; actorId: string; dateFrom: string; dateTo: string;
+  }>({ entityType: "all", action: "all", actorId: "all", dateFrom: "", dateTo: "" });
 
   const params = new URLSearchParams({ limit: "100" });
   if (applied.entityType !== "all") params.set("entity_type", applied.entityType);
   if (applied.action !== "all") params.set("action", applied.action);
+  if (applied.actorId !== "all") params.set("actor_id", applied.actorId);
   if (applied.dateFrom) params.set("date_from", applied.dateFrom);
   if (applied.dateTo) params.set("date_to", applied.dateTo);
 
@@ -228,6 +231,24 @@ export default function AuditLog() {
             </div>
 
             <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-600">Actor</label>
+              <Select value={actorId} onValueChange={setActorId}>
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="All Users" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  {(users ?? []).map(u => {
+                    const name = [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email;
+                    return (
+                      <SelectItem key={u.id} value={String(u.id)}>{name}</SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
               <label className="text-xs font-medium text-slate-600">From Date</label>
               <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-36" />
             </div>
@@ -239,7 +260,7 @@ export default function AuditLog() {
 
             <Button
               onClick={() => {
-                setApplied({ entityType, action, dateFrom, dateTo });
+                setApplied({ entityType, action, actorId, dateFrom, dateTo });
                 refetch();
               }}
             >
@@ -251,9 +272,10 @@ export default function AuditLog() {
               onClick={() => {
                 setEntityType("all");
                 setAction("all");
+                setActorId("all");
                 setDateFrom("");
                 setDateTo("");
-                setApplied({ entityType: "all", action: "all", dateFrom: "", dateTo: "" });
+                setApplied({ entityType: "all", action: "all", actorId: "all", dateFrom: "", dateTo: "" });
               }}
             >
               Clear

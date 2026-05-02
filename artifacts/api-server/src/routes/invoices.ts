@@ -438,6 +438,17 @@ router.post("/invoices/:id/send", requireAuth, loadDbUser, async (req, res): Pro
       pdfFilename: `invoice-${invoice.invoiceNumber}.pdf`,
     });
     await db.update(invoicesTable).set({ status: "sent", updatedAt: new Date() }).where(eq(invoicesTable.id, id));
+    await logAudit({
+      actorId: user.id,
+      actorRole: user.role,
+      action: "status_changed",
+      entityType: "invoice",
+      entityId: id,
+      entityLabel: invoice.invoiceNumber,
+      oldValue: { status: invoice.status },
+      newValue: { status: "sent" },
+      projectId: invoice.projectId ?? null,
+    });
     res.json({ success: true, email: invoice.client.email });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
-import { db, auditLogsTable, usersTable, projectAssignmentsTable } from "@workspace/db";
+import { db, auditLogsTable, usersTable, projectAssignmentsTable, projectsTable } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
 
 const router: IRouter = Router();
@@ -76,15 +76,29 @@ router.get("/projects/:id/activity", requireAuth, loadDbUser, async (req, res): 
   const projectId = parseInt(String(req.params.id));
   if (isNaN(projectId)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  // Admins and PMs can see any project activity; others must be assigned
+  // Admins and PMs can see any project activity
+  // Clients tied to this project via project.clientId can see it
+  // Assigned employees/freelancers can see it
   const isAdminOrPm = ["admin", "project_manager"].includes(user.role);
   if (!isAdminOrPm) {
-    const [assignment] = await db
-      .select()
-      .from(projectAssignmentsTable)
-      .where(and(eq(projectAssignmentsTable.projectId, projectId), eq(projectAssignmentsTable.userId, user.id)));
-    if (!assignment) {
-      res.status(403).json({ error: "Forbidden" }); return;
+    // Check if client is the project's client contact
+    if (user.role === "client") {
+      const [proj] = await db
+        .select({ clientId: projectsTable.clientId })
+        .from(projectsTable)
+        .where(eq(projectsTable.id, projectId));
+      if (!proj || proj.clientId !== user.id) {
+        res.status(403).json({ error: "Forbidden" }); return;
+      }
+    } else {
+      // For employees, freelancers etc — must be assigned to the project
+      const [assignment] = await db
+        .select()
+        .from(projectAssignmentsTable)
+        .where(and(eq(projectAssignmentsTable.projectId, projectId), eq(projectAssignmentsTable.userId, user.id)));
+      if (!assignment) {
+        res.status(403).json({ error: "Forbidden" }); return;
+      }
     }
   }
 

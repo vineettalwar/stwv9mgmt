@@ -25,7 +25,9 @@ export async function logAudit(params: LogAuditParams): Promise<void> {
       newValue: params.newValue ?? null,
       projectId: params.projectId ?? null,
     });
-  } catch {
-    // Audit logging is non-fatal — never crash the request
+  } catch (err) {
+    // Non-fatal so a transient DB issue never breaks a mutation, but always
+    // surface the failure in server logs for ops visibility.
+    console.error("[auditLogger] FAILED to write audit record:", err, params);
   }
 }
