@@ -184,29 +184,34 @@ router.patch("/offers/:id", requireAuth, loadDbUser, async (req, res): Promise<v
     const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, existing.companyId));
     const taxRate = company?.taxRegime === "vat" ? 19 : 0;
     totals = await computeTotals(lineItems, taxRate);
-
-    await db.delete(offerLineItemsTable).where(eq(offerLineItemsTable.offerId, id));
-    if (lineItems.length > 0) {
-      await db.insert(offerLineItemsTable).values(
-        lineItems.map((li, idx) => ({
-          offerId: id,
-          description: li.description,
-          quantity: li.quantity,
-          unitPrice: li.unitPrice,
-          amount: (parseFloat(li.quantity || "1") * parseFloat(li.unitPrice || "0")).toFixed(2),
-          sortOrder: li.sortOrder ?? idx,
-        }))
-      );
-    }
   }
 
   await db.transaction(async (tx) => {
+    if (lineItems !== undefined) {
+      await tx.delete(offerLineItemsTable).where(eq(offerLineItemsTable.offerId, id));
+      if (lineItems.length > 0) {
+        await tx.insert(offerLineItemsTable).values(
+          lineItems.map((li, idx) => ({
+            offerId: id,
+            description: li.description,
+            quantity: li.quantity,
+            unitPrice: li.unitPrice,
+            amount: (parseFloat(li.quantity || "1") * parseFloat(li.unitPrice || "0")).toFixed(2),
+            sortOrder: li.sortOrder ?? idx,
+          }))
+        );
+      }
+    }
     await tx.update(offersTable).set({ ...offerData, ...totals, updatedAt: new Date() }).where(eq(offersTable.id, id));
     if (offerData.status && offerData.status !== existing.status) {
+      const action = offerData.status === "sent" ? "sent"
+        : offerData.status === "accepted" ? "accepted"
+        : offerData.status === "rejected" ? "rejected"
+        : "status_changed";
       await logAuditTx(tx, {
         actorId: user.id,
         actorRole: user.role,
-        action: "status_changed",
+        action,
         entityType: "offer",
         entityId: id,
         entityLabel: existing.offerNumber,

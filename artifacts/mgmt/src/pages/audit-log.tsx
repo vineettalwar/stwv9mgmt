@@ -52,6 +52,8 @@ const ACTION_LABELS: Record<string, string> = {
   role_changed: "Role Changed",
   sent: "Sent",
   accepted: "Accepted",
+  rejected: "Rejected",
+  paid: "Paid",
   archived: "Archived",
   created: "Created",
 };
@@ -72,6 +74,8 @@ const ACTION_BADGE_COLORS: Record<string, string> = {
   role_changed: "bg-amber-100 text-amber-800",
   sent: "bg-sky-100 text-sky-800",
   accepted: "bg-emerald-100 text-emerald-800",
+  rejected: "bg-rose-100 text-rose-800",
+  paid: "bg-emerald-100 text-emerald-800",
   archived: "bg-slate-200 text-slate-600",
   created: "bg-teal-100 text-teal-800",
 };
@@ -231,8 +235,14 @@ export default function AuditLog() {
                 <SelectContent>
                   <SelectItem value="all">All Actions</SelectItem>
                   <SelectItem value="status_changed">Status Changed</SelectItem>
+                  <SelectItem value="created">Created</SelectItem>
+                  <SelectItem value="sent">Sent</SelectItem>
                   <SelectItem value="signed">Signed</SelectItem>
+                  <SelectItem value="accepted">Accepted</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
                   <SelectItem value="filed">Filed</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
                   <SelectItem value="role_changed">Role Changed</SelectItem>
                 </SelectContent>
               </Select>

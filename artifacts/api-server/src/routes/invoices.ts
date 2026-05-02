@@ -489,30 +489,34 @@ router.patch("/invoices/:id", requireAuth, loadDbUser, async (req, res): Promise
   if (lineItems !== undefined) {
     const taxRate = determineTaxRate(existing.taxType);
     totals = await computeTotals(lineItems, taxRate);
-
-    await db.delete(invoiceLineItemsTable).where(eq(invoiceLineItemsTable.invoiceId, id));
-    if (lineItems.length > 0) {
-      await db.insert(invoiceLineItemsTable).values(
-        lineItems.map((li, idx) => ({
-          invoiceId: id,
-          timeEntryId: li.timeEntryId ?? null,
-          description: li.description,
-          quantity: li.quantity,
-          unitPrice: li.unitPrice,
-          amount: (parseFloat(li.quantity || "1") * parseFloat(li.unitPrice || "0")).toFixed(2),
-          sortOrder: li.sortOrder ?? idx,
-        }))
-      );
-    }
   }
 
   await db.transaction(async (tx) => {
+    if (lineItems !== undefined) {
+      await tx.delete(invoiceLineItemsTable).where(eq(invoiceLineItemsTable.invoiceId, id));
+      if (lineItems.length > 0) {
+        await tx.insert(invoiceLineItemsTable).values(
+          lineItems.map((li, idx) => ({
+            invoiceId: id,
+            timeEntryId: li.timeEntryId ?? null,
+            description: li.description,
+            quantity: li.quantity,
+            unitPrice: li.unitPrice,
+            amount: (parseFloat(li.quantity || "1") * parseFloat(li.unitPrice || "0")).toFixed(2),
+            sortOrder: li.sortOrder ?? idx,
+          }))
+        );
+      }
+    }
     await tx.update(invoicesTable).set({ ...invoiceData, ...totals, updatedAt: new Date() }).where(eq(invoicesTable.id, id));
     if (invoiceData.status && invoiceData.status !== existing.status) {
+      const action = invoiceData.status === "sent" ? "sent"
+        : invoiceData.status === "paid" ? "paid"
+        : "status_changed";
       await logAuditTx(tx, {
         actorId: user.id,
         actorRole: user.role,
-        action: "status_changed",
+        action,
         entityType: "invoice",
         entityId: id,
         entityLabel: existing.invoiceNumber,

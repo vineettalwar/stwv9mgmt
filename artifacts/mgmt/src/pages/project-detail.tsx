@@ -98,6 +98,8 @@ const ACTION_LABELS: Record<string, string> = {
   role_changed: "Role Changed",
   sent: "Sent",
   accepted: "Accepted",
+  rejected: "Rejected",
+  paid: "Paid",
   archived: "Archived",
   created: "Created",
 };

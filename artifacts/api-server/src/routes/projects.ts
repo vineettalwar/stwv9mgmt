@@ -127,7 +127,7 @@ router.post("/projects", requireAuth, loadDbUser, async (req, res): Promise<void
     await logAuditTx(tx, {
       actorId: user.id,
       actorRole: user.role,
-      action: "status_changed",
+      action: "created",
       entityType: "project",
       entityId: inserted.id,
       entityLabel: inserted.name,
