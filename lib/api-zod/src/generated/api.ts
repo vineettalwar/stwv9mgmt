@@ -762,6 +762,12 @@ export const ListMyTimeEntriesResponseItem = zod.object({
   hours: zod.string(),
   description: zod.string().nullish(),
   projectName: zod.string(),
+  hourlyRate: zod
+    .string()
+    .nullish()
+    .describe(
+      "Freelancer's hourly rate for the project (null if not set or not a freelancer)",
+    ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });

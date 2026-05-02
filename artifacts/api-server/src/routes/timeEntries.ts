@@ -156,9 +156,20 @@ router.get("/time-entries", requireAuth, loadDbUser, async (req, res): Promise<v
     : [];
   const projectMap = Object.fromEntries(projects.map(p => [p.id, p.name]));
 
+  // Enrich freelancers with their hourly rate per project (for earnings calculation)
+  let rateMap: Record<number, string | null> = {};
+  if (user.role === "freelancer" && projectIds.length > 0) {
+    const rateRows = await db
+      .select({ projectId: projectAssignmentsTable.projectId, hourlyRate: projectAssignmentsTable.hourlyRate })
+      .from(projectAssignmentsTable)
+      .where(and(eq(projectAssignmentsTable.userId, user.id), inArray(projectAssignmentsTable.projectId, projectIds)));
+    rateMap = Object.fromEntries(rateRows.map(r => [r.projectId, r.hourlyRate ?? null]));
+  }
+
   const result = entries.map(e => ({
     ...e,
     projectName: projectMap[e.projectId] ?? "Unknown",
+    hourlyRate: rateMap[e.projectId] ?? null,
   }));
 
   res.json(result);

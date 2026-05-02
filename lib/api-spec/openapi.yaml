@@ -1995,6 +1995,9 @@ components:
           type: ["string", "null"]
         projectName:
           type: string
+        hourlyRate:
+          type: ["string", "null"]
+          description: "Freelancer's hourly rate for the project (null if not set or not a freelancer)"
         createdAt:
           type: string
           format: date-time

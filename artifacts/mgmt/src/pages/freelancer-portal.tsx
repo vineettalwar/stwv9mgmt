@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Clock, FolderOpen, Plus, Trash2, User } from "lucide-react";
+import { Building2, Clock, FolderOpen, Plus, TrendingUp, Trash2, User } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -179,6 +179,18 @@ export default function FreelancerPortal() {
   const assignedCompanies = me?.companies ?? [];
   const totalHours = (entries ?? []).reduce((sum, e) => sum + parseFloat(e.hours || "0"), 0);
 
+  // Earnings: sum(hours × hourlyRate) for entries that have a rate set
+  const { totalEarnings, hasRates } = (entries ?? []).reduce(
+    (acc, e) => {
+      if (e.hourlyRate) {
+        acc.totalEarnings += parseFloat(e.hours || "0") * parseFloat(e.hourlyRate);
+        acc.hasRates = true;
+      }
+      return acc;
+    },
+    { totalEarnings: 0, hasRates: false },
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -196,7 +208,7 @@ export default function FreelancerPortal() {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-slate-600">Assigned Companies</CardTitle>
@@ -220,6 +232,24 @@ export default function FreelancerPortal() {
             {entriesLoading ? <Skeleton className="h-8 w-12" /> : (
               <div className="text-2xl font-bold text-slate-900" data-testid="stat-hours-logged">
                 {totalHours.toFixed(1)}h
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-slate-600">Est. Earnings</CardTitle>
+            <TrendingUp className="h-4 w-4 text-slate-400" />
+          </CardHeader>
+          <CardContent>
+            {entriesLoading ? <Skeleton className="h-8 w-24" /> : hasRates ? (
+              <div className="text-2xl font-bold text-slate-900" data-testid="stat-estimated-earnings">
+                {totalEarnings.toFixed(2)}
+              </div>
+            ) : (
+              <div className="text-sm text-slate-400 pt-1" data-testid="stat-estimated-earnings">
+                No rates set
               </div>
             )}
           </CardContent>

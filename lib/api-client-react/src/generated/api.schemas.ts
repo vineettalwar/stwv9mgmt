@@ -284,6 +284,11 @@ export interface TimeEntryWithProject {
   /** @nullable */
   description?: string | null;
   projectName: string;
+  /**
+   * Freelancer's hourly rate for the project (null if not set or not a freelancer)
+   * @nullable
+   */
+  hourlyRate?: string | null;
   createdAt: string;
   updatedAt: string;
 }
