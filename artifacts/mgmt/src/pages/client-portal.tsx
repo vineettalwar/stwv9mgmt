@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@clerk/react";
 import { useGetMe, useListProjects, useListDeliverables, useListInvoices } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -96,6 +97,7 @@ const STATUS_INVOICE_STYLES: Record<string, { label: string; className: string }
 
 export default function ClientPortal() {
   const { toast } = useToast();
+  const { getToken } = useAuth();
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const { data: me, isLoading: meLoading } = useGetMe();
   const { data: projects, isLoading: projectsLoading } = useListProjects();
@@ -274,8 +276,7 @@ export default function ClientPortal() {
                         onClick={async () => {
                           setDownloadingId(inv.id);
                           try {
-                            const { getToken } = (window as unknown as { __clerk?: { session?: { getToken: () => Promise<string> } } }).__clerk?.session ?? {};
-                            const token = getToken ? await getToken() : null;
+                            const token = await getToken();
                             const res = await fetch(`/api/invoices/${inv.id}/pdf`, {
                               headers: token ? { Authorization: `Bearer ${token}` } : {},
                             });

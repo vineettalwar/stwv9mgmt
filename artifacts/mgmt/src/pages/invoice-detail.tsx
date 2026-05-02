@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@clerk/react";
 import { useParams, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -153,6 +154,7 @@ export default function InvoiceDetail() {
   const [, setLocation] = useLocation();
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { getToken } = useAuth();
   const { data: me } = useGetMe();
 
   const [editing, setEditing] = useState(false);
@@ -229,8 +231,7 @@ export default function InvoiceDetail() {
   async function handleDownloadPdf() {
     if (!inv) return;
     try {
-      const { getToken } = (window as unknown as { __clerk?: { session?: { getToken: () => Promise<string> } } }).__clerk?.session ?? {};
-      const token = getToken ? await getToken() : null;
+      const token = await getToken();
       const res = await fetch(`/api/invoices/${inv.id}/pdf`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

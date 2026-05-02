@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import PDFDocument from "pdfkit";
 import {
@@ -11,6 +11,7 @@ import {
   usersTable,
   projectsTable,
   timeEntriesTable,
+  userCompanyAssignmentsTable,
 } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
 
@@ -149,8 +150,25 @@ router.get("/invoices", requireAuth, loadDbUser, async (req, res): Promise<void>
   let query = db.select().from(invoicesTable);
   const conditions = [];
 
-  // Clients can only see invoices addressed to them
-  if (isClient) conditions.push(eq(invoicesTable.clientId, user.id));
+  if (isClient) {
+    // Clients see invoices for companies they are assigned to, OR invoices directly addressed to them
+    const assignments = await db
+      .select({ companyId: userCompanyAssignmentsTable.companyId })
+      .from(userCompanyAssignmentsTable)
+      .where(eq(userCompanyAssignmentsTable.userId, user.id));
+    const clientCompanyIds = assignments.map(a => a.companyId);
+    if (clientCompanyIds.length > 0) {
+      // inArray on companyId covers company-scoped invoices; clientId check covers directly addressed ones
+      conditions.push(or(
+        inArray(invoicesTable.companyId, clientCompanyIds),
+        eq(invoicesTable.clientId, user.id),
+      )!);
+    } else {
+      // No companies assigned — only show invoices directly addressed to this client
+      conditions.push(eq(invoicesTable.clientId, user.id));
+    }
+  }
+
   if (statusFilter) conditions.push(eq(invoicesTable.status, statusFilter));
   if (companyFilter && isStaff) conditions.push(eq(invoicesTable.companyId, companyFilter));
 
@@ -240,8 +258,16 @@ router.get("/invoices/:id/pdf", requireAuth, loadDbUser, async (req, res): Promi
 
   const invoiceRaw = await getInvoiceWithDetails(id);
   if (!invoiceRaw) { res.status(404).json({ error: "Not found" }); return; }
-  // Clients can only download their own invoices
-  if (isClient && invoiceRaw.clientId !== user.id) { res.status(403).json({ error: "Forbidden" }); return; }
+  // Clients can only download invoices for their assigned companies or directly addressed to them
+  if (isClient) {
+    const assignments = await db
+      .select({ companyId: userCompanyAssignmentsTable.companyId })
+      .from(userCompanyAssignmentsTable)
+      .where(eq(userCompanyAssignmentsTable.userId, user.id));
+    const clientCompanyIds = assignments.map(a => a.companyId);
+    const allowed = clientCompanyIds.includes(invoiceRaw.companyId) || invoiceRaw.clientId === user.id;
+    if (!allowed) { res.status(403).json({ error: "Forbidden" }); return; }
+  }
   const invoice = invoiceRaw;
 
   const TAX_LABELS: Record<string, string> = {
