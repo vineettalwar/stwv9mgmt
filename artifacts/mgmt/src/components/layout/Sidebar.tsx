@@ -1,74 +1,165 @@
 import { Link, useLocation } from "wouter";
-import { 
-  Building2, 
-  Users, 
-  LayoutDashboard, 
+import {
+  Building2,
+  Users,
+  LayoutDashboard,
   Settings,
-  LogOut 
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClerk } from "@clerk/react";
+import { useGetMe } from "@workspace/api-client-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
-const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Companies", href: "/companies", icon: Building2 },
-  { name: "Users", href: "/users", icon: Users },
-  { name: "Settings", href: "/settings", icon: Settings },
+type UserRole =
+  | "admin"
+  | "germany_accountant"
+  | "india_accountant"
+  | "project_manager"
+  | "client"
+  | "freelancer";
+
+type NavItem = {
+  name: string;
+  href: string;
+  icon: React.ElementType;
+  allowedRoles: UserRole[];
+};
+
+const navigation: NavItem[] = [
+  {
+    name: "Dashboard",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+    allowedRoles: [
+      "admin",
+      "germany_accountant",
+      "india_accountant",
+      "project_manager",
+    ],
+  },
+  {
+    name: "Companies",
+    href: "/companies",
+    icon: Building2,
+    allowedRoles: [
+      "admin",
+      "germany_accountant",
+      "india_accountant",
+      "project_manager",
+    ],
+  },
+  {
+    name: "Users",
+    href: "/users",
+    icon: Users,
+    allowedRoles: ["admin"],
+  },
+  {
+    name: "Settings",
+    href: "/settings",
+    icon: Settings,
+    allowedRoles: [
+      "admin",
+      "germany_accountant",
+      "india_accountant",
+      "project_manager",
+      "client",
+      "freelancer",
+    ],
+  },
 ];
 
 export function Sidebar() {
   const [location] = useLocation();
   const { signOut } = useClerk();
+  const { data: me, isLoading } = useGetMe();
+
+  const role = (me?.role as UserRole | undefined) ?? null;
+
+  const visibleNav = role
+    ? navigation.filter((item) => item.allowedRoles.includes(role))
+    : [];
 
   return (
     <div className="flex h-full w-64 flex-col bg-slate-900 text-slate-50 border-r border-slate-800">
       <div className="flex h-16 items-center px-6 border-b border-slate-800">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-white font-mono font-bold mr-3 shadow-sm border border-slate-700">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-700 text-white font-mono font-bold mr-3 shadow-sm border border-slate-600">
           S
         </div>
-        <span className="text-sm font-bold tracking-tight">STWV Mgmt</span>
+        <div>
+          <span className="text-sm font-bold tracking-tight block">STWV Mgmt</span>
+          {me && (
+            <span className="text-xs text-slate-400 capitalize">
+              {me.role.replace(/_/g, " ")}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto py-4">
-        <nav className="space-y-1 px-3">
-          {navigation.map((item) => {
-            const isActive = location.startsWith(item.href);
-            return (
-              <Link key={item.name} href={item.href}>
-                <a
-                  data-testid={`nav-${item.name.toLowerCase()}`}
-                  className={cn(
-                    isActive
-                      ? "bg-slate-800 text-white"
-                      : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-100",
-                    "group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors"
-                  )}
-                >
-                  <item.icon
+        {isLoading ? (
+          <div className="space-y-1 px-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-9 w-full bg-slate-800" />
+            ))}
+          </div>
+        ) : (
+          <nav className="space-y-1 px-3">
+            {visibleNav.map((item) => {
+              const isActive = location.startsWith(item.href);
+              return (
+                <Link key={item.name} href={item.href}>
+                  <a
+                    data-testid={`nav-${item.name.toLowerCase()}`}
                     className={cn(
-                      isActive ? "text-slate-300" : "text-slate-500 group-hover:text-slate-300",
-                      "mr-3 h-5 w-5 flex-shrink-0 transition-colors"
+                      isActive
+                        ? "bg-slate-800 text-white"
+                        : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-100",
+                      "group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
                     )}
-                    aria-hidden="true"
-                  />
-                  {item.name}
-                </a>
-              </Link>
-            );
-          })}
-        </nav>
+                  >
+                    <item.icon
+                      className={cn(
+                        isActive
+                          ? "text-slate-300"
+                          : "text-slate-500 group-hover:text-slate-300",
+                        "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
+                      )}
+                      aria-hidden="true"
+                    />
+                    {item.name}
+                  </a>
+                </Link>
+              );
+            })}
+          </nav>
+        )}
       </div>
 
-      <div className="p-4 border-t border-slate-800">
-        <button
-          onClick={() => signOut()}
-          data-testid="nav-signout"
-          className="group flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-100 transition-colors"
-        >
-          <LogOut className="mr-3 h-5 w-5 flex-shrink-0 text-slate-500 group-hover:text-slate-300 transition-colors" />
-          Sign out
-        </button>
-      </div>
+      {me && (
+        <div className="px-4 py-3 border-t border-slate-800">
+          <div className="flex items-center gap-3 mb-3 px-1">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-slate-200 font-semibold text-sm flex-shrink-0">
+              {me.firstName?.[0] ?? me.email[0].toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-medium text-slate-200 truncate">
+                {[me.firstName, me.lastName].filter(Boolean).join(" ") || me.email}
+              </div>
+              <div className="text-xs text-slate-400 truncate">{me.email}</div>
+            </div>
+          </div>
+          <button
+            onClick={() => signOut()}
+            data-testid="nav-signout"
+            className="group flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-100 transition-colors"
+          >
+            <LogOut className="mr-3 h-5 w-5 flex-shrink-0 text-slate-500 group-hover:text-slate-300 transition-colors" />
+            Sign out
+          </button>
+        </div>
+      )}
     </div>
   );
 }

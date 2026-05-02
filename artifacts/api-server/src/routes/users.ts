@@ -17,12 +17,11 @@ import {
   UpdateUserResponse,
   GetUserCompaniesResponse,
 } from "@workspace/api-zod";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, requireAdmin, loadDbUser } from "../middlewares/requireRole";
 import { getAuth } from "@clerk/express";
 
 const router: IRouter = Router();
 
-// Helper: get user with their company assignments
 async function getUserWithCompanies(userId: number) {
   const user = await db.select().from(usersTable).where(eq(usersTable.id, userId)).then(r => r[0]);
   if (!user) return null;
@@ -34,21 +33,20 @@ async function getUserWithCompanies(userId: number) {
   return { ...user, companies: assignments.map(a => a.company) };
 }
 
-router.get("/users", requireAuth, async (_req, res): Promise<void> => {
+// List all users — admin only
+router.get("/users", requireAuth, requireAdmin, async (_req, res): Promise<void> => {
   const users = await db.select().from(usersTable).orderBy(usersTable.id);
-  const usersWithCompanies = await Promise.all(
-    users.map(u => getUserWithCompanies(u.id))
-  );
+  const usersWithCompanies = await Promise.all(users.map(u => getUserWithCompanies(u.id)));
   res.json(ListUsersResponse.parse(usersWithCompanies));
 });
 
+// Self-register (upsert) — any authenticated user
 router.post("/users", requireAuth, async (req, res): Promise<void> => {
   const parsed = CreateUserBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  // Upsert by clerkUserId
   const existing = await db
     .select()
     .from(usersTable)
@@ -64,6 +62,7 @@ router.post("/users", requireAuth, async (req, res): Promise<void> => {
   res.status(201).json(GetUserResponse.parse(full));
 });
 
+// Current user profile — any authenticated user
 router.get("/users/me", requireAuth, async (req, res): Promise<void> => {
   const auth = getAuth(req);
   const clerkId = auth?.userId;
@@ -84,10 +83,22 @@ router.get("/users/me", requireAuth, async (req, res): Promise<void> => {
   res.json(GetMeResponse.parse(full));
 });
 
+// Get specific user — admin only (or self)
 router.get("/users/:id", requireAuth, async (req, res): Promise<void> => {
   const params = GetUserParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+  // Allow self-access or admin
+  const auth = getAuth(req);
+  const self = await db.select().from(usersTable)
+    .where(eq(usersTable.clerkUserId, auth?.userId ?? ""))
+    .then(r => r[0]);
+  const isSelf = self?.id === params.data.id;
+  const isAdmin = self?.role === "admin";
+  if (!isSelf && !isAdmin) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
   const user = await getUserWithCompanies(params.data.id);
@@ -98,7 +109,8 @@ router.get("/users/:id", requireAuth, async (req, res): Promise<void> => {
   res.json(GetUserResponse.parse(user));
 });
 
-router.patch("/users/:id", requireAuth, async (req, res): Promise<void> => {
+// Update user — admin only
+router.patch("/users/:id", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const params = UpdateUserParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -122,7 +134,8 @@ router.patch("/users/:id", requireAuth, async (req, res): Promise<void> => {
   res.json(UpdateUserResponse.parse(full));
 });
 
-router.delete("/users/:id", requireAuth, async (req, res): Promise<void> => {
+// Delete user — admin only
+router.delete("/users/:id", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const params = DeleteUserParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -132,11 +145,21 @@ router.delete("/users/:id", requireAuth, async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
-// Company assignments
+// Get user's company assignments — admin or self
 router.get("/users/:id/companies", requireAuth, async (req, res): Promise<void> => {
   const params = GetUserCompaniesParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const auth = getAuth(req);
+  const self = await db.select().from(usersTable)
+    .where(eq(usersTable.clerkUserId, auth?.userId ?? ""))
+    .then(r => r[0]);
+  const isSelf = self?.id === params.data.id;
+  const isAdmin = self?.role === "admin";
+  if (!isSelf && !isAdmin) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
   const assignments = await db
@@ -153,7 +176,8 @@ router.get("/users/:id/companies", requireAuth, async (req, res): Promise<void> 
   res.json(GetUserCompaniesResponse.parse(assignments));
 });
 
-router.post("/users/:id/companies", requireAuth, async (req, res): Promise<void> => {
+// Assign company — admin only
+router.post("/users/:id/companies", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const params = AssignUserToCompanyParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -170,7 +194,6 @@ router.post("/users/:id/companies", requireAuth, async (req, res): Promise<void>
     .onConflictDoNothing()
     .returning();
   if (!assignment) {
-    // Already assigned - return existing
     const existing = await db
       .select({
         id: userCompanyAssignmentsTable.id,
@@ -184,8 +207,8 @@ router.post("/users/:id/companies", requireAuth, async (req, res): Promise<void>
       .where(
         and(
           eq(userCompanyAssignmentsTable.userId, params.data.id),
-          eq(userCompanyAssignmentsTable.companyId, parsed.data.companyId)
-        )
+          eq(userCompanyAssignmentsTable.companyId, parsed.data.companyId),
+        ),
       )
       .then(r => r[0]);
     res.status(201).json(existing);
@@ -205,7 +228,8 @@ router.post("/users/:id/companies", requireAuth, async (req, res): Promise<void>
   res.status(201).json(withCompany);
 });
 
-router.delete("/users/:id/companies/:companyId", requireAuth, async (req, res): Promise<void> => {
+// Remove company assignment — admin only
+router.delete("/users/:id/companies/:companyId", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const params = RemoveUserFromCompanyParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -216,8 +240,8 @@ router.delete("/users/:id/companies/:companyId", requireAuth, async (req, res): 
     .where(
       and(
         eq(userCompanyAssignmentsTable.userId, params.data.id),
-        eq(userCompanyAssignmentsTable.companyId, params.data.companyId)
-      )
+        eq(userCompanyAssignmentsTable.companyId, params.data.companyId),
+      ),
     );
   res.sendStatus(204);
 });

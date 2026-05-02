@@ -90,6 +90,39 @@ All routes require Clerk auth (Bearer token). Prefix: `/api`
 - `ClerkProviderWithRouter` wraps inside `WouterRouter` so `useLocation` works correctly
 - `PrivateRoute` uses `useAuth().isSignedIn` (not `SignedIn`/`SignedOut` components — not exported in @clerk/react v6)
 
+## RBAC (Role-Based Access Control)
+
+### Server-side (`artifacts/api-server/src/middlewares/requireRole.ts`)
+- `requireAuth` — any authenticated Clerk user
+- `requireReader` — admin, germany_accountant, india_accountant, project_manager
+- `requireAdmin` — admin only
+- `loadDbUser` — loads `req.dbUser` from DB by Clerk userId (returns 403 if user not in platform)
+
+Applied to routes:
+- GET /companies, /companies/:id, /dashboard/stats → `requireReader`
+- POST/PATCH/DELETE /companies → `requireAdmin`
+- GET /users → `requireAdmin`
+- POST /users (self-register), GET /users/me → `requireAuth`
+- GET/PATCH/DELETE /users/:id → admin or self only
+- GET/POST/DELETE /users/:id/companies → admin or self only
+
+### Frontend (`artifacts/mgmt/src/App.tsx`)
+- `PrivateRoute` accepts `allowedRoles?: UserRole[]`; fetches `useGetMe()` and redirects non-permitted roles to /dashboard
+- /users, /users/:id → admin only
+- /dashboard, /companies, /companies/:id → staff roles (admin + accountants + project_manager)
+- /settings → all roles
+
+### Sidebar (`artifacts/mgmt/src/components/layout/Sidebar.tsx`)
+- Calls `useGetMe()` and filters navigation items by the user's role
+- Shows user name, email, role label, and sign-out button at the bottom
+
+## Seed Script
+
+```bash
+pnpm --filter @workspace/db run seed
+```
+Creates the 4 company entities if they don't already exist (idempotent via `onConflictDoNothing`).
+
 ## Codegen Notes
 
 After changing `lib/api-spec/openapi.yaml`:

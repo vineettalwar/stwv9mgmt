@@ -1,10 +1,10 @@
 import React, { useEffect, type ReactNode } from "react";
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ClerkProvider, RedirectToSignIn, useAuth } from "@clerk/react";
-import { setAuthTokenGetter } from "@workspace/api-client-react";
+import { setAuthTokenGetter, useGetMe } from "@workspace/api-client-react";
 
 import { Layout } from "@/components/layout/Layout";
 import NotFound from "@/pages/not-found";
@@ -20,15 +20,21 @@ import SignUpPage from "@/pages/sign-up";
 const queryClient = new QueryClient();
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
+type UserRole =
+  | "admin"
+  | "germany_accountant"
+  | "india_accountant"
+  | "project_manager"
+  | "client"
+  | "freelancer";
+
 function ApiTokenBridge() {
   const { getToken } = useAuth();
-
   useEffect(() => {
     setAuthTokenGetter(async () => {
       return await getToken();
     });
   }, [getToken]);
-
   return null;
 }
 
@@ -45,8 +51,15 @@ function ClerkProviderWithRouter({ children }: { children: ReactNode }) {
   );
 }
 
-function PrivateRoute({ component: Component }: { component: React.ComponentType }) {
+function PrivateRoute({
+  component: Component,
+  allowedRoles,
+}: {
+  component: React.ComponentType;
+  allowedRoles?: UserRole[];
+}) {
   const { isSignedIn, isLoaded } = useAuth();
+  const { data: me, isLoading: meLoading } = useGetMe();
 
   if (!isLoaded) {
     return (
@@ -58,6 +71,13 @@ function PrivateRoute({ component: Component }: { component: React.ComponentType
 
   if (!isSignedIn) {
     return <RedirectToSignIn />;
+  }
+
+  if (allowedRoles && !meLoading && me) {
+    const userRole = me.role as UserRole;
+    if (!allowedRoles.includes(userRole)) {
+      return <Redirect to="/dashboard" replace />;
+    }
   }
 
   return (
@@ -75,18 +95,64 @@ function RedirectToDashboard() {
   return null;
 }
 
+const ADMIN_ONLY: UserRole[] = ["admin"];
+const STAFF_ROLES: UserRole[] = [
+  "admin",
+  "germany_accountant",
+  "india_accountant",
+  "project_manager",
+];
+const ALL_ROLES: UserRole[] = [
+  "admin",
+  "germany_accountant",
+  "india_accountant",
+  "project_manager",
+  "client",
+  "freelancer",
+];
+
 function Router() {
   return (
     <Switch>
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/sign-up" component={SignUpPage} />
       <Route path="/" component={RedirectToDashboard} />
-      <Route path="/dashboard" component={() => <PrivateRoute component={Dashboard} />} />
-      <Route path="/companies" component={() => <PrivateRoute component={Companies} />} />
-      <Route path="/companies/:id" component={() => <PrivateRoute component={CompanyDetail} />} />
-      <Route path="/users" component={() => <PrivateRoute component={Users} />} />
-      <Route path="/users/:id" component={() => <PrivateRoute component={UserDetail} />} />
-      <Route path="/settings" component={() => <PrivateRoute component={Settings} />} />
+      <Route
+        path="/dashboard"
+        component={() => (
+          <PrivateRoute component={Dashboard} allowedRoles={STAFF_ROLES} />
+        )}
+      />
+      <Route
+        path="/companies"
+        component={() => (
+          <PrivateRoute component={Companies} allowedRoles={STAFF_ROLES} />
+        )}
+      />
+      <Route
+        path="/companies/:id"
+        component={() => (
+          <PrivateRoute component={CompanyDetail} allowedRoles={STAFF_ROLES} />
+        )}
+      />
+      <Route
+        path="/users"
+        component={() => (
+          <PrivateRoute component={Users} allowedRoles={ADMIN_ONLY} />
+        )}
+      />
+      <Route
+        path="/users/:id"
+        component={() => (
+          <PrivateRoute component={UserDetail} allowedRoles={ADMIN_ONLY} />
+        )}
+      />
+      <Route
+        path="/settings"
+        component={() => (
+          <PrivateRoute component={Settings} allowedRoles={ALL_ROLES} />
+        )}
+      />
       <Route component={NotFound} />
     </Switch>
   );

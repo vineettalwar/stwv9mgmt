@@ -11,11 +11,11 @@ import {
   GetCompanyResponse,
   UpdateCompanyResponse,
 } from "@workspace/api-zod";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, requireAdmin, requireReader } from "../middlewares/requireRole";
 
 const router: IRouter = Router();
 
-router.get("/companies", requireAuth, async (_req, res): Promise<void> => {
+router.get("/companies", requireAuth, requireReader, async (_req, res): Promise<void> => {
   const companies = await db
     .select()
     .from(companiesTable)
@@ -23,7 +23,7 @@ router.get("/companies", requireAuth, async (_req, res): Promise<void> => {
   res.json(ListCompaniesResponse.parse(companies));
 });
 
-router.post("/companies", requireAuth, async (req, res): Promise<void> => {
+router.post("/companies", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const parsed = CreateCompanyBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -36,7 +36,7 @@ router.post("/companies", requireAuth, async (req, res): Promise<void> => {
   res.status(201).json(GetCompanyResponse.parse(company));
 });
 
-router.get("/companies/:id", requireAuth, async (req, res): Promise<void> => {
+router.get("/companies/:id", requireAuth, requireReader, async (req, res): Promise<void> => {
   const params = GetCompanyParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -53,7 +53,7 @@ router.get("/companies/:id", requireAuth, async (req, res): Promise<void> => {
   res.json(GetCompanyResponse.parse(company));
 });
 
-router.patch("/companies/:id", requireAuth, async (req, res): Promise<void> => {
+router.patch("/companies/:id", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const params = UpdateCompanyParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -76,7 +76,7 @@ router.patch("/companies/:id", requireAuth, async (req, res): Promise<void> => {
   res.json(UpdateCompanyResponse.parse(company));
 });
 
-router.delete("/companies/:id", requireAuth, async (req, res): Promise<void> => {
+router.delete("/companies/:id", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const params = DeleteCompanyParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

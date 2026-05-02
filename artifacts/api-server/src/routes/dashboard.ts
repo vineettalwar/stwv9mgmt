@@ -1,11 +1,11 @@
 import { Router, type IRouter } from "express";
 import { db, usersTable, companiesTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, requireReader } from "../middlewares/requireRole";
 
 const router: IRouter = Router();
 
-router.get("/dashboard/stats", requireAuth, async (_req, res): Promise<void> => {
+router.get("/dashboard/stats", requireAuth, requireReader, async (_req, res): Promise<void> => {
   const [totalCompaniesResult, totalUsersResult, usersByRoleResult, companiesByCountryResult] = await Promise.all([
     db.select({ count: sql<number>`count(*)::int` }).from(companiesTable).then(r => r[0]),
     db.select({ count: sql<number>`count(*)::int` }).from(usersTable).then(r => r[0]),
