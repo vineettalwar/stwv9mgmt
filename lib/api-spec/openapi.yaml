@@ -1941,6 +1941,111 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminDashboardStats"
 
+  # ───── REPORTS ─────
+  /reports/revenue-trend:
+    get:
+      operationId: getRevenueTrend
+      tags: [reports]
+      summary: Monthly invoiced revenue over the last N months, broken down by company
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: months
+          schema: { type: integer, minimum: 1, maximum: 36 }
+        - in: query
+          name: companyId
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Revenue trend points
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevenueTrendReport"
+
+  /reports/project-profitability:
+    get:
+      operationId: getProjectProfitability
+      tags: [reports]
+      summary: Per-project invoiced totals, hours, costs, and net margin
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: companyId
+          schema: { type: integer }
+        - in: query
+          name: startDate
+          schema: { type: string }
+        - in: query
+          name: endDate
+          schema: { type: string }
+      responses:
+        "200":
+          description: Profitability rows
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectProfitabilityReport"
+
+  /reports/time-summary:
+    get:
+      operationId: getTimeSummary
+      tags: [reports]
+      summary: Hours logged per project and per user across a date range
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: startDate
+          required: true
+          schema: { type: string }
+        - in: query
+          name: endDate
+          required: true
+          schema: { type: string }
+        - in: query
+          name: companyId
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Time summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimeSummaryReport"
+
+  /reports/export:
+    get:
+      operationId: exportReport
+      tags: [reports]
+      summary: Download a report as CSV
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: type
+          required: true
+          schema:
+            type: string
+            enum: [revenue-trend, project-profitability, time-summary]
+        - in: query
+          name: months
+          schema: { type: integer }
+        - in: query
+          name: companyId
+          schema: { type: integer }
+        - in: query
+          name: startDate
+          schema: { type: string }
+        - in: query
+          name: endDate
+          schema: { type: string }
+      responses:
+        "200":
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+
 components:
   securitySchemes:
     bearerAuth:
@@ -3308,6 +3413,124 @@ components:
         - companyId
         - regime
         - year
+
+    # ─── Reports ───
+    RevenueTrendPoint:
+      type: object
+      properties:
+        month:
+          type: string
+        companyId:
+          type: integer
+        companyName:
+          type: string
+        currency:
+          type: string
+        total:
+          type: string
+      required: [month, companyId, companyName, currency, total]
+
+    RevenueTrendReport:
+      type: object
+      properties:
+        months:
+          type: integer
+        companyId:
+          type: ["integer", "null"]
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/RevenueTrendPoint"
+      required: [months, companyId, points]
+
+    ProjectProfitabilityRow:
+      type: object
+      properties:
+        projectId:
+          type: integer
+        projectName:
+          type: string
+        status:
+          type: string
+        companyId:
+          type: ["integer", "null"]
+        companyName:
+          type: ["string", "null"]
+        currency:
+          type: string
+        totalInvoiced:
+          type: string
+        totalHours:
+          type: string
+        totalCost:
+          type: string
+        margin:
+          type: string
+      required: [projectId, projectName, status, companyId, companyName, currency, totalInvoiced, totalHours, totalCost, margin]
+
+    ProjectProfitabilityReport:
+      type: object
+      properties:
+        companyId:
+          type: ["integer", "null"]
+        startDate:
+          type: ["string", "null"]
+        endDate:
+          type: ["string", "null"]
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectProfitabilityRow"
+      required: [companyId, startDate, endDate, rows]
+
+    TimeSummaryByProject:
+      type: object
+      properties:
+        projectId:
+          type: integer
+        projectName:
+          type: string
+        companyName:
+          type: ["string", "null"]
+        totalHours:
+          type: string
+      required: [projectId, projectName, companyName, totalHours]
+
+    TimeSummaryByUser:
+      type: object
+      properties:
+        userId:
+          type: integer
+        email:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        role:
+          type: string
+        totalHours:
+          type: string
+      required: [userId, email, firstName, lastName, role, totalHours]
+
+    TimeSummaryReport:
+      type: object
+      properties:
+        startDate:
+          type: string
+        endDate:
+          type: string
+        companyId:
+          type: ["integer", "null"]
+        byProject:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimeSummaryByProject"
+        byUser:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimeSummaryByUser"
+      required: [startDate, endDate, companyId, byProject, byUser]
 
     # ─── Admin Dashboard ───
     AdminDashboardStats:

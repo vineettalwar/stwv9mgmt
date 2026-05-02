@@ -723,6 +723,74 @@ export interface SeedComplianceBody {
   year: number;
 }
 
+export interface RevenueTrendPoint {
+  month: string;
+  companyId: number;
+  companyName: string;
+  currency: string;
+  total: string;
+}
+
+export interface RevenueTrendReport {
+  months: number;
+  /** @nullable */
+  companyId: number | null;
+  points: RevenueTrendPoint[];
+}
+
+export interface ProjectProfitabilityRow {
+  projectId: number;
+  projectName: string;
+  status: string;
+  /** @nullable */
+  companyId: number | null;
+  /** @nullable */
+  companyName: string | null;
+  currency: string;
+  totalInvoiced: string;
+  totalHours: string;
+  totalCost: string;
+  margin: string;
+}
+
+export interface ProjectProfitabilityReport {
+  /** @nullable */
+  companyId: number | null;
+  /** @nullable */
+  startDate: string | null;
+  /** @nullable */
+  endDate: string | null;
+  rows: ProjectProfitabilityRow[];
+}
+
+export interface TimeSummaryByProject {
+  projectId: number;
+  projectName: string;
+  /** @nullable */
+  companyName: string | null;
+  totalHours: string;
+}
+
+export interface TimeSummaryByUser {
+  userId: number;
+  email: string;
+  /** @nullable */
+  firstName: string | null;
+  /** @nullable */
+  lastName: string | null;
+  role: string;
+  totalHours: string;
+}
+
+export interface TimeSummaryReport {
+  startDate: string;
+  endDate: string;
+  /** @nullable */
+  companyId: number | null;
+  byProject: TimeSummaryByProject[];
+  byUser: TimeSummaryByUser[];
+}
+
 export type AdminDashboardStatsPendingInvoices = {
   count: number;
   totalAmount: string;
@@ -968,3 +1036,41 @@ export type ListAuditLogsParams = {
   limit?: number;
   offset?: number;
 };
+
+export type GetRevenueTrendParams = {
+  /**
+   * @minimum 1
+   * @maximum 36
+   */
+  months?: number;
+  companyId?: number;
+};
+
+export type GetProjectProfitabilityParams = {
+  companyId?: number;
+  startDate?: string;
+  endDate?: string;
+};
+
+export type GetTimeSummaryParams = {
+  startDate: string;
+  endDate: string;
+  companyId?: number;
+};
+
+export type ExportReportParams = {
+  type: ExportReportType;
+  months?: number;
+  companyId?: number;
+  startDate?: string;
+  endDate?: string;
+};
+
+export type ExportReportType =
+  (typeof ExportReportType)[keyof typeof ExportReportType];
+
+export const ExportReportType = {
+  "revenue-trend": "revenue-trend",
+  "project-profitability": "project-profitability",
+  "time-summary": "time-summary",
+} as const;

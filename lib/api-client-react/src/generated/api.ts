@@ -43,8 +43,12 @@ import type {
   DashboardStats,
   Deliverable,
   ErrorResponse,
+  ExportReportParams,
   ExportTallyParams,
   GetProjectBillingSummaryParams,
+  GetProjectProfitabilityParams,
+  GetRevenueTrendParams,
+  GetTimeSummaryParams,
   HealthStatus,
   Invoice,
   ListAuditLogsParams,
@@ -59,12 +63,15 @@ import type {
   Offer,
   Project,
   ProjectAssignment,
+  ProjectProfitabilityReport,
   ProjectThread,
+  RevenueTrendReport,
   SeedComplianceBody,
   SendDocumentResponse,
   SendMessageBody,
   TimeEntry,
   TimeEntryWithProject,
+  TimeSummaryReport,
   Todo,
   UpdateCompanyBody,
   UpdateComplianceItemBody,
@@ -7362,6 +7369,394 @@ export function useGetAdminDashboardStats<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetAdminDashboardStatsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Monthly invoiced revenue over the last N months, broken down by company
+ */
+export const getGetRevenueTrendUrl = (params?: GetRevenueTrendParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/reports/revenue-trend?${stringifiedParams}`
+    : `/api/reports/revenue-trend`;
+};
+
+export const getRevenueTrend = async (
+  params?: GetRevenueTrendParams,
+  options?: RequestInit,
+): Promise<RevenueTrendReport> => {
+  return customFetch<RevenueTrendReport>(getGetRevenueTrendUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetRevenueTrendQueryKey = (params?: GetRevenueTrendParams) => {
+  return [`/api/reports/revenue-trend`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetRevenueTrendQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRevenueTrend>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetRevenueTrendParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getRevenueTrend>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetRevenueTrendQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getRevenueTrend>>> = ({
+    signal,
+  }) => getRevenueTrend(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getRevenueTrend>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetRevenueTrendQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRevenueTrend>>
+>;
+export type GetRevenueTrendQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Monthly invoiced revenue over the last N months, broken down by company
+ */
+
+export function useGetRevenueTrend<
+  TData = Awaited<ReturnType<typeof getRevenueTrend>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetRevenueTrendParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getRevenueTrend>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetRevenueTrendQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Per-project invoiced totals, hours, costs, and net margin
+ */
+export const getGetProjectProfitabilityUrl = (
+  params?: GetProjectProfitabilityParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/reports/project-profitability?${stringifiedParams}`
+    : `/api/reports/project-profitability`;
+};
+
+export const getProjectProfitability = async (
+  params?: GetProjectProfitabilityParams,
+  options?: RequestInit,
+): Promise<ProjectProfitabilityReport> => {
+  return customFetch<ProjectProfitabilityReport>(
+    getGetProjectProfitabilityUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetProjectProfitabilityQueryKey = (
+  params?: GetProjectProfitabilityParams,
+) => {
+  return [
+    `/api/reports/project-profitability`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetProjectProfitabilityQueryOptions = <
+  TData = Awaited<ReturnType<typeof getProjectProfitability>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetProjectProfitabilityParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProjectProfitability>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetProjectProfitabilityQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getProjectProfitability>>
+  > = ({ signal }) =>
+    getProjectProfitability(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getProjectProfitability>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetProjectProfitabilityQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getProjectProfitability>>
+>;
+export type GetProjectProfitabilityQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Per-project invoiced totals, hours, costs, and net margin
+ */
+
+export function useGetProjectProfitability<
+  TData = Awaited<ReturnType<typeof getProjectProfitability>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetProjectProfitabilityParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProjectProfitability>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetProjectProfitabilityQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Hours logged per project and per user across a date range
+ */
+export const getGetTimeSummaryUrl = (params: GetTimeSummaryParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/reports/time-summary?${stringifiedParams}`
+    : `/api/reports/time-summary`;
+};
+
+export const getTimeSummary = async (
+  params: GetTimeSummaryParams,
+  options?: RequestInit,
+): Promise<TimeSummaryReport> => {
+  return customFetch<TimeSummaryReport>(getGetTimeSummaryUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetTimeSummaryQueryKey = (params?: GetTimeSummaryParams) => {
+  return [`/api/reports/time-summary`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetTimeSummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTimeSummary>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetTimeSummaryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTimeSummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetTimeSummaryQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getTimeSummary>>> = ({
+    signal,
+  }) => getTimeSummary(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTimeSummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetTimeSummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTimeSummary>>
+>;
+export type GetTimeSummaryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Hours logged per project and per user across a date range
+ */
+
+export function useGetTimeSummary<
+  TData = Awaited<ReturnType<typeof getTimeSummary>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetTimeSummaryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTimeSummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetTimeSummaryQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Download a report as CSV
+ */
+export const getExportReportUrl = (params: ExportReportParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/reports/export?${stringifiedParams}`
+    : `/api/reports/export`;
+};
+
+export const exportReport = async (
+  params: ExportReportParams,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getExportReportUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getExportReportQueryKey = (params?: ExportReportParams) => {
+  return [`/api/reports/export`, ...(params ? [params] : [])] as const;
+};
+
+export const getExportReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof exportReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params: ExportReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getExportReportQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof exportReport>>> = ({
+    signal,
+  }) => exportReport(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof exportReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ExportReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof exportReport>>
+>;
+export type ExportReportQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Download a report as CSV
+ */
+
+export function useExportReport<
+  TData = Awaited<ReturnType<typeof exportReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params: ExportReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getExportReportQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

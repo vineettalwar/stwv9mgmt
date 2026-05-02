@@ -2253,3 +2253,104 @@ export const GetAdminDashboardStatsResponse = zod.object({
   topPendingInvoices: zod.array(zod.object({}).passthrough()),
   recentOpenOffers: zod.array(zod.object({}).passthrough()),
 });
+
+/**
+ * @summary Monthly invoiced revenue over the last N months, broken down by company
+ */
+export const getRevenueTrendQueryMonthsMax = 36;
+
+export const GetRevenueTrendQueryParams = zod.object({
+  months: zod.coerce
+    .number()
+    .min(1)
+    .max(getRevenueTrendQueryMonthsMax)
+    .optional(),
+  companyId: zod.coerce.number().optional(),
+});
+
+export const GetRevenueTrendResponse = zod.object({
+  months: zod.number(),
+  companyId: zod.number().nullable(),
+  points: zod.array(
+    zod.object({
+      month: zod.string(),
+      companyId: zod.number(),
+      companyName: zod.string(),
+      currency: zod.string(),
+      total: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Per-project invoiced totals, hours, costs, and net margin
+ */
+export const GetProjectProfitabilityQueryParams = zod.object({
+  companyId: zod.coerce.number().optional(),
+  startDate: zod.coerce.string().optional(),
+  endDate: zod.coerce.string().optional(),
+});
+
+export const GetProjectProfitabilityResponse = zod.object({
+  companyId: zod.number().nullable(),
+  startDate: zod.string().nullable(),
+  endDate: zod.string().nullable(),
+  rows: zod.array(
+    zod.object({
+      projectId: zod.number(),
+      projectName: zod.string(),
+      status: zod.string(),
+      companyId: zod.number().nullable(),
+      companyName: zod.string().nullable(),
+      currency: zod.string(),
+      totalInvoiced: zod.string(),
+      totalHours: zod.string(),
+      totalCost: zod.string(),
+      margin: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Hours logged per project and per user across a date range
+ */
+export const GetTimeSummaryQueryParams = zod.object({
+  startDate: zod.coerce.string(),
+  endDate: zod.coerce.string(),
+  companyId: zod.coerce.number().optional(),
+});
+
+export const GetTimeSummaryResponse = zod.object({
+  startDate: zod.string(),
+  endDate: zod.string(),
+  companyId: zod.number().nullable(),
+  byProject: zod.array(
+    zod.object({
+      projectId: zod.number(),
+      projectName: zod.string(),
+      companyName: zod.string().nullable(),
+      totalHours: zod.string(),
+    }),
+  ),
+  byUser: zod.array(
+    zod.object({
+      userId: zod.number(),
+      email: zod.string(),
+      firstName: zod.string().nullable(),
+      lastName: zod.string().nullable(),
+      role: zod.string(),
+      totalHours: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Download a report as CSV
+ */
+export const ExportReportQueryParams = zod.object({
+  type: zod.enum(["revenue-trend", "project-profitability", "time-summary"]),
+  months: zod.coerce.number().optional(),
+  companyId: zod.coerce.number().optional(),
+  startDate: zod.coerce.string().optional(),
+  endDate: zod.coerce.string().optional(),
+});

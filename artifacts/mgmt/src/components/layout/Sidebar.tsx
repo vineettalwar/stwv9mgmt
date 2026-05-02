@@ -17,6 +17,7 @@ import {
   Shield,
   GitCommitHorizontal,
   ScrollText,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClerk } from "@clerk/react";
@@ -137,6 +138,13 @@ const navigation: NavItem[] = [
     icon: ScrollText,
     testId: "nav-audit-log",
     allowedRoles: ["admin"],
+  },
+  {
+    name: "Reports",
+    href: "/reports",
+    icon: BarChart3,
+    testId: "nav-reports",
+    allowedRoles: ["admin", "project_manager"],
   },
   {
     name: "My Portal",
