@@ -7,6 +7,8 @@ import {
   LogOut,
   Briefcase,
   Clock,
+  FolderOpen,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClerk } from "@clerk/react";
@@ -52,6 +54,27 @@ const navigation: NavItem[] = [
     allowedRoles: ["admin"],
   },
   {
+    name: "Projects",
+    href: "/projects",
+    icon: FolderOpen,
+    testId: "nav-projects",
+    allowedRoles: ["admin", "germany_accountant", "india_accountant", "project_manager", "freelancer"],
+  },
+  {
+    name: "Time Tracking",
+    href: "/time-tracking",
+    icon: Clock,
+    testId: "nav-time-tracking",
+    allowedRoles: ["admin", "germany_accountant", "india_accountant", "project_manager", "freelancer"],
+  },
+  {
+    name: "TODOs",
+    href: "/todos",
+    icon: ClipboardList,
+    testId: "nav-todos",
+    allowedRoles: ["admin", "germany_accountant", "india_accountant", "project_manager"],
+  },
+  {
     name: "My Portal",
     href: "/client-portal",
     icon: Briefcase,
@@ -61,7 +84,7 @@ const navigation: NavItem[] = [
   {
     name: "My Portal",
     href: "/freelancer-portal",
-    icon: Clock,
+    icon: Briefcase,
     testId: "nav-freelancer-portal",
     allowedRoles: ["freelancer"],
   },

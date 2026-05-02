@@ -18,12 +18,15 @@ import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
 import ClientPortal from "@/pages/client-portal";
 import FreelancerPortal from "@/pages/freelancer-portal";
+import Projects from "@/pages/projects";
+import ProjectDetail from "@/pages/project-detail";
+import TimeTracking from "@/pages/time-tracking";
+import Todos from "@/pages/todos";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error) => {
-        // Don't retry on 401/403
         const e = error as { status?: number };
         if (e?.status === 401 || e?.status === 403) return false;
         return failureCount < 2;
@@ -62,11 +65,6 @@ function ClerkProviderWithRouter({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * PrivateRoute guards a page by auth state and role.
- * useGetMe() hits GET /users/me which auto-provisions the user on first visit —
- * so new Clerk users are automatically added to the platform DB.
- */
 function PrivateRoute({
   component: Component,
   allowedRoles,
@@ -103,10 +101,6 @@ function PrivateRoute({
   );
 }
 
-/**
- * SmartRedirect: sends authenticated users to the correct home based on role.
- * Relies on useGetMe() which auto-provisions the user record on first sign-in.
- */
 function SmartRedirect() {
   const { isSignedIn, isLoaded } = useAuth();
   const { data: me, isLoading: meLoading } = useGetMe();
@@ -130,6 +124,8 @@ function SmartRedirect() {
 
 const ADMIN_ONLY: UserRole[] = ["admin"];
 const STAFF_ROLES: UserRole[] = ["admin", "germany_accountant", "india_accountant", "project_manager"];
+const PM_ROLES: UserRole[] = ["admin", "project_manager"];
+const WORKER_ROLES: UserRole[] = ["admin", "germany_accountant", "india_accountant", "project_manager", "freelancer"];
 const CLIENT_ONLY: UserRole[] = ["client"];
 const FREELANCER_ONLY: UserRole[] = ["freelancer"];
 const ALL_ROLES: UserRole[] = ["admin", "germany_accountant", "india_accountant", "project_manager", "client", "freelancer"];
@@ -147,6 +143,10 @@ function Router() {
       <Route path="/companies/:id" component={() => <PrivateRoute component={CompanyDetail} allowedRoles={STAFF_ROLES} />} />
       <Route path="/users" component={() => <PrivateRoute component={Users} allowedRoles={ADMIN_ONLY} />} />
       <Route path="/users/:id" component={() => <PrivateRoute component={UserDetail} allowedRoles={ADMIN_ONLY} />} />
+      <Route path="/projects" component={() => <PrivateRoute component={Projects} allowedRoles={ALL_ROLES} />} />
+      <Route path="/projects/:id" component={() => <PrivateRoute component={ProjectDetail} allowedRoles={ALL_ROLES} />} />
+      <Route path="/time-tracking" component={() => <PrivateRoute component={TimeTracking} allowedRoles={WORKER_ROLES} />} />
+      <Route path="/todos" component={() => <PrivateRoute component={Todos} allowedRoles={STAFF_ROLES} />} />
       <Route path="/client-portal" component={() => <PrivateRoute component={ClientPortal} allowedRoles={CLIENT_ONLY} />} />
       <Route path="/freelancer-portal" component={() => <PrivateRoute component={FreelancerPortal} allowedRoles={FREELANCER_ONLY} />} />
       <Route path="/settings" component={() => <PrivateRoute component={Settings} allowedRoles={ALL_ROLES} />} />

@@ -146,3 +146,314 @@ export interface DashboardStats {
   usersByRole: RoleCount[];
   companiesByCountry: CountryCount[];
 }
+
+export interface UserBasic {
+  id: number;
+  email: string;
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+  role: string;
+}
+
+export interface Project {
+  id: number;
+  name: string;
+  /** One of: one_time, monthly_fixed, amc, internal */
+  type: string;
+  companyId: number;
+  /** @nullable */
+  clientId?: number | null;
+  /** @nullable */
+  description?: string | null;
+  /** One of: active, completed, on_hold */
+  status: string;
+  /** One of: hourly, fixed, retainer */
+  billingModel: string;
+  /** @nullable */
+  fixedAllocationHours?: string | null;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+  company: Company;
+  client?: UserBasic | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateProjectBody {
+  name: string;
+  /** One of: one_time, monthly_fixed, amc, internal */
+  type: string;
+  companyId: number;
+  /** @nullable */
+  clientId?: number | null;
+  /** @nullable */
+  description?: string | null;
+  /** One of: active, completed, on_hold */
+  status?: string;
+  /** One of: hourly, fixed, retainer */
+  billingModel: string;
+  /** @nullable */
+  fixedAllocationHours?: string | null;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+}
+
+export interface UpdateProjectBody {
+  name?: string;
+  type?: string;
+  companyId?: number;
+  /** @nullable */
+  clientId?: number | null;
+  /** @nullable */
+  description?: string | null;
+  status?: string;
+  billingModel?: string;
+  /** @nullable */
+  fixedAllocationHours?: string | null;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+}
+
+export interface ProjectAssignment {
+  id: number;
+  projectId: number;
+  userId: number;
+  /** One of: employee, freelancer */
+  memberType: string;
+  /** @nullable */
+  hourlyRate?: string | null;
+  /** @nullable */
+  monthlyRate?: string | null;
+  user: UserBasic;
+  createdAt: string;
+}
+
+export interface CreateProjectAssignmentBody {
+  userId: number;
+  /** One of: employee, freelancer */
+  memberType: string;
+  /** @nullable */
+  hourlyRate?: string | null;
+  /** @nullable */
+  monthlyRate?: string | null;
+}
+
+export interface MemberHoursSummary {
+  userId: number;
+  userName: string;
+  loggedHours: string;
+}
+
+export interface BillingSummary {
+  projectId: number;
+  month: string;
+  /** @nullable */
+  fixedAllocationHours?: string | null;
+  loggedHours: string;
+  /** @nullable */
+  remainingHours?: string | null;
+  memberBreakdown: MemberHoursSummary[];
+}
+
+export interface TimeEntry {
+  id: number;
+  projectId: number;
+  userId: number;
+  date: string;
+  hours: string;
+  /** @nullable */
+  description?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TimeEntryWithProject {
+  id: number;
+  projectId: number;
+  userId: number;
+  date: string;
+  hours: string;
+  /** @nullable */
+  description?: string | null;
+  projectName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTimeEntryBody {
+  /** YYYY-MM-DD */
+  date: string;
+  hours: string;
+  /** @nullable */
+  description?: string | null;
+}
+
+export interface UpdateTimeEntryBody {
+  date?: string;
+  hours?: string;
+  /** @nullable */
+  description?: string | null;
+}
+
+export interface Deliverable {
+  id: number;
+  projectId: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  /** One of: todo, in_progress, done */
+  status: string;
+  /** @nullable */
+  assigneeId?: number | null;
+  /** @nullable */
+  dueDate?: string | null;
+  assignee?: UserBasic | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDeliverableBody {
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  status?: string;
+  /** @nullable */
+  assigneeId?: number | null;
+  /** @nullable */
+  dueDate?: string | null;
+}
+
+export interface UpdateDeliverableBody {
+  title?: string;
+  /** @nullable */
+  description?: string | null;
+  status?: string;
+  /** @nullable */
+  assigneeId?: number | null;
+  /** @nullable */
+  dueDate?: string | null;
+}
+
+export interface Milestone {
+  id: number;
+  projectId: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  /** One of: pending, completed */
+  status: string;
+  /** @nullable */
+  dueDate?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateMilestoneBody {
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  status?: string;
+  /** @nullable */
+  dueDate?: string | null;
+}
+
+export interface UpdateMilestoneBody {
+  title?: string;
+  /** @nullable */
+  description?: string | null;
+  status?: string;
+  /** @nullable */
+  dueDate?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+}
+
+export interface Todo {
+  id: number;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  clientId?: number | null;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  /** One of: low, medium, high */
+  priority: string;
+  /** One of: open, done */
+  status: string;
+  /** @nullable */
+  assigneeId?: number | null;
+  /** @nullable */
+  dueDate?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+  assignee?: UserBasic | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTodoBody {
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  clientId?: number | null;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  priority?: string;
+  /** @nullable */
+  assigneeId?: number | null;
+  /** @nullable */
+  dueDate?: string | null;
+}
+
+export interface UpdateTodoBody {
+  title?: string;
+  /** @nullable */
+  description?: string | null;
+  priority?: string;
+  status?: string;
+  /** @nullable */
+  assigneeId?: number | null;
+  /** @nullable */
+  dueDate?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+}
+
+export type GetProjectBillingSummaryParams = {
+  /**
+   * YYYY-MM format, defaults to current month
+   */
+  month?: string;
+};
+
+export type ListProjectTimeEntriesParams = {
+  userId?: number;
+  /**
+   * YYYY-MM format
+   */
+  month?: string;
+};
+
+export type ListMyTimeEntriesParams = {
+  /**
+   * YYYY-MM format
+   */
+  month?: string;
+};
+
+export type ListTodosParams = {
+  projectId?: number;
+  status?: string;
+};

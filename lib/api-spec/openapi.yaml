@@ -16,6 +16,16 @@ tags:
     description: User management and role assignment
   - name: dashboard
     description: Dashboard summaries and stats
+  - name: projects
+    description: Project management
+  - name: time_entries
+    description: Time tracking and hour logging
+  - name: deliverables
+    description: Deliverable and task tracking
+  - name: milestones
+    description: Milestone tracking
+  - name: todos
+    description: TODO and task management
 
 paths:
   /healthz:
@@ -379,6 +389,615 @@ paths:
               schema:
                 $ref: "#/components/schemas/DashboardStats"
 
+  # ───── PROJECTS ─────
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List projects (filtered by role)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a project
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectBody"
+      responses:
+        "201":
+          description: Created project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a project
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update a project
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectBody"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      summary: Delete a project
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /projects/{id}/assignments:
+    get:
+      operationId: listProjectAssignments
+      tags: [projects]
+      summary: List project member assignments
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectAssignment"
+    post:
+      operationId: createProjectAssignment
+      tags: [projects]
+      summary: Assign a user to a project
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectAssignmentBody"
+      responses:
+        "201":
+          description: Assignment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectAssignment"
+
+  /projects/{id}/assignments/{userId}:
+    delete:
+      operationId: deleteProjectAssignment
+      tags: [projects]
+      summary: Remove a user from a project
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+
+  /projects/{id}/billing-summary:
+    get:
+      operationId: getProjectBillingSummary
+      tags: [projects]
+      summary: Get billing cycle summary (hours logged vs allocation)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: month
+          in: query
+          required: false
+          schema:
+            type: string
+            description: "YYYY-MM format, defaults to current month"
+      responses:
+        "200":
+          description: Billing summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingSummary"
+
+  # ───── TIME ENTRIES ─────
+  /projects/{id}/time-entries:
+    get:
+      operationId: listProjectTimeEntries
+      tags: [time_entries]
+      summary: List time entries for a project
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: month
+          in: query
+          required: false
+          schema:
+            type: string
+            description: "YYYY-MM format"
+      responses:
+        "200":
+          description: List of time entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TimeEntry"
+    post:
+      operationId: createTimeEntry
+      tags: [time_entries]
+      summary: Log a time entry
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTimeEntryBody"
+      responses:
+        "201":
+          description: Time entry created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimeEntry"
+
+  /projects/{id}/time-entries/{entryId}:
+    patch:
+      operationId: updateTimeEntry
+      tags: [time_entries]
+      summary: Update a time entry
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTimeEntryBody"
+      responses:
+        "200":
+          description: Updated time entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimeEntry"
+    delete:
+      operationId: deleteTimeEntry
+      tags: [time_entries]
+      summary: Delete a time entry
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /time-entries:
+    get:
+      operationId: listMyTimeEntries
+      tags: [time_entries]
+      summary: List time entries for the current user (or all if admin)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: month
+          in: query
+          required: false
+          schema:
+            type: string
+            description: "YYYY-MM format"
+      responses:
+        "200":
+          description: List of time entries with project info
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TimeEntryWithProject"
+
+  # ───── DELIVERABLES ─────
+  /projects/{id}/deliverables:
+    get:
+      operationId: listDeliverables
+      tags: [deliverables]
+      summary: List deliverables for a project
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of deliverables
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Deliverable"
+    post:
+      operationId: createDeliverable
+      tags: [deliverables]
+      summary: Create a deliverable
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDeliverableBody"
+      responses:
+        "201":
+          description: Deliverable created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deliverable"
+
+  /projects/{id}/deliverables/{deliverableId}:
+    patch:
+      operationId: updateDeliverable
+      tags: [deliverables]
+      summary: Update a deliverable
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: deliverableId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDeliverableBody"
+      responses:
+        "200":
+          description: Updated deliverable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deliverable"
+    delete:
+      operationId: deleteDeliverable
+      tags: [deliverables]
+      summary: Delete a deliverable
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: deliverableId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ───── MILESTONES ─────
+  /projects/{id}/milestones:
+    get:
+      operationId: listMilestones
+      tags: [milestones]
+      summary: List milestones for a project
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of milestones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Milestone"
+    post:
+      operationId: createMilestone
+      tags: [milestones]
+      summary: Create a milestone
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMilestoneBody"
+      responses:
+        "201":
+          description: Milestone created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Milestone"
+
+  /projects/{id}/milestones/{milestoneId}:
+    patch:
+      operationId: updateMilestone
+      tags: [milestones]
+      summary: Update a milestone
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: milestoneId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMilestoneBody"
+      responses:
+        "200":
+          description: Updated milestone
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Milestone"
+    delete:
+      operationId: deleteMilestone
+      tags: [milestones]
+      summary: Delete a milestone
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: milestoneId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ───── TODOS ─────
+  /todos:
+    get:
+      operationId: listTodos
+      tags: [todos]
+      summary: List TODOs (filtered by role)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: projectId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of TODOs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Todo"
+    post:
+      operationId: createTodo
+      tags: [todos]
+      summary: Create a TODO
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTodoBody"
+      responses:
+        "201":
+          description: TODO created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Todo"
+
+  /todos/{id}:
+    patch:
+      operationId: updateTodo
+      tags: [todos]
+      summary: Update a TODO
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTodoBody"
+      responses:
+        "200":
+          description: Updated TODO
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Todo"
+    delete:
+      operationId: deleteTodo
+      tags: [todos]
+      summary: Delete a TODO
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
 components:
   securitySchemes:
     bearerAuth:
@@ -654,3 +1273,513 @@ components:
       required:
         - country
         - count
+
+    # ─── Projects ───
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          description: "One of: one_time, monthly_fixed, amc, internal"
+        companyId:
+          type: integer
+        clientId:
+          type: ["integer", "null"]
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          description: "One of: active, completed, on_hold"
+        billingModel:
+          type: string
+          description: "One of: hourly, fixed, retainer"
+        fixedAllocationHours:
+          type: ["string", "null"]
+        startDate:
+          type: ["string", "null"]
+        endDate:
+          type: ["string", "null"]
+        company:
+          $ref: "#/components/schemas/Company"
+        client:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/UserBasic"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - type
+        - companyId
+        - status
+        - billingModel
+        - company
+        - createdAt
+        - updatedAt
+
+    UserBasic:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        role:
+          type: string
+      required:
+        - id
+        - email
+        - role
+
+    CreateProjectBody:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          description: "One of: one_time, monthly_fixed, amc, internal"
+        companyId:
+          type: integer
+        clientId:
+          type: ["integer", "null"]
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          description: "One of: active, completed, on_hold"
+        billingModel:
+          type: string
+          description: "One of: hourly, fixed, retainer"
+        fixedAllocationHours:
+          type: ["string", "null"]
+        startDate:
+          type: ["string", "null"]
+        endDate:
+          type: ["string", "null"]
+      required:
+        - name
+        - type
+        - companyId
+        - billingModel
+
+    UpdateProjectBody:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        companyId:
+          type: integer
+        clientId:
+          type: ["integer", "null"]
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+        billingModel:
+          type: string
+        fixedAllocationHours:
+          type: ["string", "null"]
+        startDate:
+          type: ["string", "null"]
+        endDate:
+          type: ["string", "null"]
+
+    ProjectAssignment:
+      type: object
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        userId:
+          type: integer
+        memberType:
+          type: string
+          description: "One of: employee, freelancer"
+        hourlyRate:
+          type: ["string", "null"]
+        monthlyRate:
+          type: ["string", "null"]
+        user:
+          $ref: "#/components/schemas/UserBasic"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - projectId
+        - userId
+        - memberType
+        - user
+        - createdAt
+
+    CreateProjectAssignmentBody:
+      type: object
+      properties:
+        userId:
+          type: integer
+        memberType:
+          type: string
+          description: "One of: employee, freelancer"
+        hourlyRate:
+          type: ["string", "null"]
+        monthlyRate:
+          type: ["string", "null"]
+      required:
+        - userId
+        - memberType
+
+    BillingSummary:
+      type: object
+      properties:
+        projectId:
+          type: integer
+        month:
+          type: string
+        fixedAllocationHours:
+          type: ["string", "null"]
+        loggedHours:
+          type: string
+        remainingHours:
+          type: ["string", "null"]
+        memberBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberHoursSummary"
+      required:
+        - projectId
+        - month
+        - loggedHours
+        - memberBreakdown
+
+    MemberHoursSummary:
+      type: object
+      properties:
+        userId:
+          type: integer
+        userName:
+          type: string
+        loggedHours:
+          type: string
+      required:
+        - userId
+        - userName
+        - loggedHours
+
+    # ─── Time Entries ───
+    TimeEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        userId:
+          type: integer
+        date:
+          type: string
+        hours:
+          type: string
+        description:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - projectId
+        - userId
+        - date
+        - hours
+        - createdAt
+        - updatedAt
+
+    TimeEntryWithProject:
+      type: object
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        userId:
+          type: integer
+        date:
+          type: string
+        hours:
+          type: string
+        description:
+          type: ["string", "null"]
+        projectName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - projectId
+        - userId
+        - date
+        - hours
+        - projectName
+        - createdAt
+        - updatedAt
+
+    CreateTimeEntryBody:
+      type: object
+      properties:
+        date:
+          type: string
+          description: "YYYY-MM-DD"
+        hours:
+          type: string
+        description:
+          type: ["string", "null"]
+      required:
+        - date
+        - hours
+
+    UpdateTimeEntryBody:
+      type: object
+      properties:
+        date:
+          type: string
+        hours:
+          type: string
+        description:
+          type: ["string", "null"]
+
+    # ─── Deliverables ───
+    Deliverable:
+      type: object
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          description: "One of: todo, in_progress, done"
+        assigneeId:
+          type: ["integer", "null"]
+        dueDate:
+          type: ["string", "null"]
+        assignee:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/UserBasic"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - projectId
+        - title
+        - status
+        - createdAt
+        - updatedAt
+
+    CreateDeliverableBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+        assigneeId:
+          type: ["integer", "null"]
+        dueDate:
+          type: ["string", "null"]
+      required:
+        - title
+
+    UpdateDeliverableBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+        assigneeId:
+          type: ["integer", "null"]
+        dueDate:
+          type: ["string", "null"]
+
+    # ─── Milestones ───
+    Milestone:
+      type: object
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          description: "One of: pending, completed"
+        dueDate:
+          type: ["string", "null"]
+        completedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - projectId
+        - title
+        - status
+        - createdAt
+        - updatedAt
+
+    CreateMilestoneBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+        dueDate:
+          type: ["string", "null"]
+      required:
+        - title
+
+    UpdateMilestoneBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+        dueDate:
+          type: ["string", "null"]
+        completedAt:
+          type: ["string", "null"]
+          format: date-time
+
+    # ─── Todos ───
+    Todo:
+      type: object
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: ["integer", "null"]
+        clientId:
+          type: ["integer", "null"]
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        priority:
+          type: string
+          description: "One of: low, medium, high"
+        status:
+          type: string
+          description: "One of: open, done"
+        assigneeId:
+          type: ["integer", "null"]
+        dueDate:
+          type: ["string", "null"]
+        completedAt:
+          type: ["string", "null"]
+          format: date-time
+        assignee:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/UserBasic"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - priority
+        - status
+        - createdAt
+        - updatedAt
+
+    CreateTodoBody:
+      type: object
+      properties:
+        projectId:
+          type: ["integer", "null"]
+        clientId:
+          type: ["integer", "null"]
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        priority:
+          type: string
+        assigneeId:
+          type: ["integer", "null"]
+        dueDate:
+          type: ["string", "null"]
+      required:
+        - title
+
+    UpdateTodoBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        priority:
+          type: string
+        status:
+          type: string
+        assigneeId:
+          type: ["integer", "null"]
+        dueDate:
+          type: ["string", "null"]
+        completedAt:
+          type: ["string", "null"]
+          format: date-time

@@ -50,6 +50,25 @@ lib/
 ### userCompanyAssignments (junction)
 - id, userId, companyId, createdAt
 
+### projects
+- id, name, type (one_time|monthly_fixed|amc|internal), companyId, clientId (nullable), description, status (active|completed|on_hold), billingModel (hourly|fixed|retainer), fixedAllocationHours (text, nullable), startDate, endDate, createdAt, updatedAt
+
+### projectAssignments (junction)
+- id, projectId, userId, memberType (employee|freelancer), hourlyRate (text, nullable), monthlyRate (text, nullable), createdAt
+- Unique on (projectId, userId)
+
+### timeEntries
+- id, projectId, userId, date (YYYY-MM-DD), hours (text), description (nullable), createdAt, updatedAt
+
+### deliverables
+- id, projectId, title, description (nullable), status (todo|in_progress|done), assigneeId (nullable), dueDate (nullable), createdAt, updatedAt
+
+### milestones
+- id, projectId, title, description (nullable), status (pending|completed), dueDate (nullable), completedAt (nullable), createdAt, updatedAt
+
+### todos
+- id, projectId (nullable), clientId (nullable), title, description (nullable), priority (low|medium|high), status (open|done), assigneeId (nullable), dueDate (nullable), completedAt (nullable), createdAt, updatedAt
+
 ## Seeded Companies
 
 1. STWV UG — Germany, VAT, EUR
@@ -71,6 +90,22 @@ All routes require Clerk auth (Bearer token). Prefix: `/api`
 - `DELETE /users/:id/companies/:companyId` — remove assignment
 - `GET /dashboard/stats` — aggregated counts by role and country
 
+### Projects & Time Tracking (Task 2)
+- `GET|POST /projects` — list (role-filtered) / create
+- `GET|PATCH|DELETE /projects/:id` — detail / update / delete
+- `GET|POST /projects/:id/assignments` — list team members / add
+- `DELETE /projects/:id/assignments/:userId` — remove team member
+- `GET /projects/:id/billing-summary?month=YYYY-MM` — hours/allocation summary
+- `GET|POST /projects/:id/deliverables` — Kanban items
+- `PATCH|DELETE /projects/:id/deliverables/:deliverableId` — update / delete deliverable
+- `GET|POST /projects/:id/milestones` — milestones
+- `PATCH|DELETE /projects/:id/milestones/:milestoneId` — update / delete milestone
+- `GET|POST /projects/:id/time-entries` — time entries per project
+- `PATCH|DELETE /projects/:id/time-entries/:entryId` — update / delete entry
+- `GET /time-entries` — all time entries for current user (or all if admin/accountant)
+- `GET|POST /todos` — list (role-filtered) / create
+- `PATCH|DELETE /todos/:id` — update / delete todo
+
 ## Frontend Pages
 
 - `/` → redirects to `/dashboard`
@@ -82,6 +117,12 @@ All routes require Clerk auth (Bearer token). Prefix: `/api`
 - `/users` — searchable user table with role badges
 - `/users/:id` — user detail + edit + company assignment management
 - `/settings` — current user profile + sign out
+- `/projects` — project list (role-filtered), create/edit, 4 types
+- `/projects/:id` — tabbed detail: Overview, Deliverables (Kanban), Milestones, Time Entries, Billing Cycle
+- `/time-tracking` — personal time log; admins/accountants see all entries
+- `/todos` — task list with priority, due date, toggle done; role-filtered
+- `/client-portal` — client view: their projects + deliverable status
+- `/freelancer-portal` — freelancer view: assigned projects + time log
 
 ## Auth Notes
 
