@@ -70,7 +70,7 @@ const TAX_TYPE_LABELS: Record<string, string> = {
   igst: "IGST 18%",
 };
 
-type LineItem = { description: string; quantity: string; unitPrice: string; timeEntryId?: number | null };
+type LineItem = { description: string; quantity: string; unitPrice: string; timeEntryId?: number | null; expenseId?: number | null };
 
 function LineItemsEditor({ items, onChange }: { items: LineItem[]; onChange: (items: LineItem[]) => void }) {
   function addItem() {
@@ -135,7 +135,6 @@ function CreateInvoiceDialog({ onCreated }: { onCreated: () => void }) {
   const [lineItems, setLineItems] = useState<LineItem[]>([{ description: "", quantity: "1", unitPrice: "0" }]);
   const [selectedTimeEntries, setSelectedTimeEntries] = useState<number[]>([]);
   const [selectedExpenseIds, setSelectedExpenseIds] = useState<number[]>([]);
-  const [importedExpenseIds, setImportedExpenseIds] = useState<number[]>([]);
   const { toast } = useToast();
   const { data: companies } = useListCompanies();
   const { data: users } = useListUsers();
@@ -157,7 +156,6 @@ function CreateInvoiceDialog({ onCreated }: { onCreated: () => void }) {
         toast({ title: "Invoice created" });
         setOpen(false);
         setSelectedExpenseIds([]);
-        setImportedExpenseIds([]);
         onCreated();
       },
       onError: (e: unknown) => toast({ title: "Error", description: String(e), variant: "destructive" }),
@@ -183,17 +181,25 @@ function CreateInvoiceDialog({ onCreated }: { onCreated: () => void }) {
 
   function importExpenses() {
     if (!unbilledExpenses || selectedExpenseIds.length === 0) return;
-    const toImport = (unbilledExpenses as Expense[]).filter(e => selectedExpenseIds.includes(e.id));
+    const alreadyImported = new Set(lineItems.map(li => li.expenseId).filter(Boolean));
+    const toImport = (unbilledExpenses as Expense[]).filter(
+      e => selectedExpenseIds.includes(e.id) && !alreadyImported.has(e.id),
+    );
+    if (toImport.length === 0) {
+      toast({ title: "All selected expenses are already imported", variant: "destructive" });
+      setSelectedExpenseIds([]);
+      return;
+    }
     const newItems: LineItem[] = toImport.map(e => ({
       description: `Expense (${e.category}): ${e.description} [${e.date}]`,
       quantity: "1",
       unitPrice: parseFloat(e.amount).toFixed(2),
+      expenseId: e.id,
     }));
     setLineItems(prev => {
       const filtered = prev.filter(li => li.description.trim() || parseFloat(li.unitPrice) > 0);
       return [...filtered, ...newItems];
     });
-    setImportedExpenseIds(prev => [...new Set([...prev, ...selectedExpenseIds])]);
     setSelectedExpenseIds([]);
     toast({ title: `${newItems.length} expense${newItems.length !== 1 ? "s" : ""} imported as line items` });
   }
@@ -238,7 +244,9 @@ function CreateInvoiceDialog({ onCreated }: { onCreated: () => void }) {
         isRecurring: form.isRecurring,
         recurringInterval: form.isRecurring ? form.recurringInterval : null,
         lineItems: lineItems.filter(li => li.description.trim()),
-        expenseIds: importedExpenseIds.length > 0 ? importedExpenseIds : undefined,
+        expenseIds: lineItems.flatMap(li => (li.expenseId ? [li.expenseId] : [])).length > 0
+          ? lineItems.flatMap(li => (li.expenseId ? [li.expenseId] : []))
+          : undefined,
       },
     });
   }
