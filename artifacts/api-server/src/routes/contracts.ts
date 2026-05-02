@@ -310,7 +310,20 @@ router.post("/contracts/:id/send", requireAuth, loadDbUser, async (req, res): Pr
       pdfBuffer,
       pdfFilename: `contract-${contract.contractNumber}.pdf`,
     });
-    await db.update(contractsTable).set({ status: "sent", updatedAt: new Date() }).where(eq(contractsTable.id, id));
+    await db.transaction(async (tx) => {
+      await tx.update(contractsTable).set({ status: "sent", updatedAt: new Date() }).where(eq(contractsTable.id, id));
+      await logAuditTx(tx, {
+        actorId: user.id,
+        actorRole: user.role,
+        action: "sent",
+        entityType: "contract",
+        entityId: id,
+        entityLabel: contract.contractNumber,
+        oldValue: { status: contract.status },
+        newValue: { status: "sent" },
+        projectId: contract.projectId ?? null,
+      });
+    });
     res.json({ success: true, email: contract.client.email });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

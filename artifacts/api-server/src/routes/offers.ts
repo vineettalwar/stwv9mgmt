@@ -451,7 +451,7 @@ router.post("/offers/:id/send", requireAuth, loadDbUser, async (req, res): Promi
       await logAuditTx(tx, {
         actorId: user.id,
         actorRole: user.role,
-        action: "status_changed",
+        action: "sent",
         entityType: "offer",
         entityId: id,
         entityLabel: offer.offerNumber,
@@ -503,7 +503,7 @@ router.post("/offers/:id/convert-to-contract", requireAuth, loadDbUser, async (r
     await logAuditTx(tx, {
       actorId: user.id,
       actorRole: user.role,
-      action: "status_changed",
+      action: "accepted",
       entityType: "offer",
       entityId: id,
       entityLabel: offer.offerNumber,

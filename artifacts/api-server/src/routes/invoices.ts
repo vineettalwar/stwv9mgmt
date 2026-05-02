@@ -442,7 +442,7 @@ router.post("/invoices/:id/send", requireAuth, loadDbUser, async (req, res): Pro
       await logAuditTx(tx, {
         actorId: user.id,
         actorRole: user.role,
-        action: "status_changed",
+        action: "sent",
         entityType: "invoice",
         entityId: id,
         entityLabel: invoice.invoiceNumber,
