@@ -154,36 +154,56 @@ export const ListUsersResponseItem = zod.object({
 export const ListUsersResponse = zod.array(ListUsersResponseItem);
 
 /**
- * @summary Provision or sync authenticated user
- * All fields are optional hints. Identity is always derived server-side
- * from the Clerk auth token — client values are ignored for security.
- */
-export const CreateUserBody = zod.object({
-  firstName: zod.string().nullish(),
-  lastName: zod.string().nullish(),
-}).optional();
+ * Creates a platform user record for the authenticated Clerk user if one does not already exist (auto-provision). All identity (email, name) is derived server-side from the Clerk JWT — request body fields are optional hints only and are never trusted for identity or role assignment. Returns 201 for a newly created user, 200 if the user already exists.
 
-/**
- * @summary Pre-register a user (admin only)
+ * @summary Provision or sync authenticated user
  */
-export const AdminCreateUserBody = zod.object({
-  email: zod.string().email(),
+export const CreateUserBody = zod
+  .object({
+    firstName: zod.string().nullish(),
+    lastName: zod.string().nullish(),
+  })
+  .describe(
+    "All fields are optional hints. Identity (email, name, role) is always derived server-side from the Clerk auth token. Client-provided values are ignored for security.\n",
+  );
+
+export const CreateUserResponse = zod.object({
+  id: zod.number(),
+  clerkUserId: zod.string(),
+  email: zod.string(),
   firstName: zod.string().nullish(),
   lastName: zod.string().nullish(),
   role: zod
-    .enum([
-      "admin",
-      "germany_accountant",
-      "india_accountant",
-      "project_manager",
-      "client",
-      "freelancer",
-    ])
-    .default("freelancer"),
+    .string()
+    .describe(
+      "One of: admin, germany_accountant, india_accountant, project_manager, client, freelancer",
+    ),
+  isActive: zod.boolean(),
+  companies: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+      legalForm: zod.string(),
+      country: zod.string(),
+      taxRegime: zod.string().describe("One of: vat, gst, none"),
+      taxNumber: zod.string().nullish(),
+      address: zod.string().nullish(),
+      bankDetails: zod.string().nullish(),
+      logoUrl: zod.string().nullish(),
+      currency: zod.string(),
+      isActive: zod.boolean(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
 });
 
 /**
- * @summary Get current authenticated user profile
+ * Returns the platform user record for the authenticated Clerk user. If no record exists yet, one is auto-provisioned from the Clerk identity (email, name derived server-side). Never returns 404.
+
+ * @summary Get (or auto-provision) current authenticated user profile
  */
 export const GetMeResponse = zod.object({
   id: zod.number(),
@@ -217,6 +237,27 @@ export const GetMeResponse = zod.object({
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
+
+/**
+ * Admin-only endpoint to pre-register a user with a specific role before they sign up via Clerk. A placeholder clerkUserId of "pending:{email}" is stored; it is linked to the real Clerk account when the user first signs in and their account is provisioned via GET /users/me or POST /users.
+
+ * @summary Pre-register a user (admin only)
+ */
+export const AdminCreateUserBody = zod
+  .object({
+    email: zod.string().email(),
+    firstName: zod.string().nullish(),
+    lastName: zod.string().nullish(),
+    role: zod
+      .string()
+      .optional()
+      .describe(
+        "One of: admin, germany_accountant, india_accountant, project_manager, client, freelancer",
+      ),
+  })
+  .describe(
+    "Pre-register a user before they sign up. Email is required; the Clerk account will be linked automatically when the user first signs in.\n",
+  );
 
 /**
  * @summary Get a user

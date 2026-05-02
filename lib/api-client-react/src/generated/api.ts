@@ -17,6 +17,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AdminCreateUserBody,
   AssignUserToCompanyBody,
   Company,
   CreateCompanyBody,
@@ -600,14 +601,16 @@ export function useListUsers<
 }
 
 /**
- * @summary Create or sync a user
+ * Creates a platform user record for the authenticated Clerk user if one does not already exist (auto-provision). All identity (email, name) is derived server-side from the Clerk JWT — request body fields are optional hints only and are never trusted for identity or role assignment. Returns 201 for a newly created user, 200 if the user already exists.
+
+ * @summary Provision or sync authenticated user
  */
 export const getCreateUserUrl = () => {
   return `/api/users`;
 };
 
 export const createUser = async (
-  createUserBody: CreateUserBody,
+  createUserBody?: CreateUserBody,
   options?: RequestInit,
 ): Promise<User> => {
   return customFetch<User>(getCreateUserUrl(), {
@@ -663,7 +666,7 @@ export type CreateUserMutationBody = BodyType<CreateUserBody>;
 export type CreateUserMutationError = ErrorType<unknown>;
 
 /**
- * @summary Create or sync a user
+ * @summary Provision or sync authenticated user
  */
 export const useCreateUser = <
   TError = ErrorType<unknown>,
@@ -686,7 +689,9 @@ export const useCreateUser = <
 };
 
 /**
- * @summary Get current authenticated user profile
+ * Returns the platform user record for the authenticated Clerk user. If no record exists yet, one is auto-provisioned from the Clerk identity (email, name derived server-side). Never returns 404.
+
+ * @summary Get (or auto-provision) current authenticated user profile
  */
 export const getGetMeUrl = () => {
   return `/api/users/me`;
@@ -705,7 +710,7 @@ export const getGetMeQueryKey = () => {
 
 export const getGetMeQueryOptions = <
   TData = Awaited<ReturnType<typeof getMe>>,
-  TError = ErrorType<ErrorResponse>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: UseQueryOptions<Awaited<ReturnType<typeof getMe>>, TError, TData>;
   request?: SecondParameter<typeof customFetch>;
@@ -726,15 +731,15 @@ export const getGetMeQueryOptions = <
 };
 
 export type GetMeQueryResult = NonNullable<Awaited<ReturnType<typeof getMe>>>;
-export type GetMeQueryError = ErrorType<ErrorResponse>;
+export type GetMeQueryError = ErrorType<unknown>;
 
 /**
- * @summary Get current authenticated user profile
+ * @summary Get (or auto-provision) current authenticated user profile
  */
 
 export function useGetMe<
   TData = Awaited<ReturnType<typeof getMe>>,
-  TError = ErrorType<ErrorResponse>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: UseQueryOptions<Awaited<ReturnType<typeof getMe>>, TError, TData>;
   request?: SecondParameter<typeof customFetch>;
@@ -747,6 +752,94 @@ export function useGetMe<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Admin-only endpoint to pre-register a user with a specific role before they sign up via Clerk. A placeholder clerkUserId of "pending:{email}" is stored; it is linked to the real Clerk account when the user first signs in and their account is provisioned via GET /users/me or POST /users.
+
+ * @summary Pre-register a user (admin only)
+ */
+export const getAdminCreateUserUrl = () => {
+  return `/api/admin/users`;
+};
+
+export const adminCreateUser = async (
+  adminCreateUserBody: AdminCreateUserBody,
+  options?: RequestInit,
+): Promise<User> => {
+  return customFetch<User>(getAdminCreateUserUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(adminCreateUserBody),
+  });
+};
+
+export const getAdminCreateUserMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminCreateUser>>,
+    TError,
+    { data: BodyType<AdminCreateUserBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminCreateUser>>,
+  TError,
+  { data: BodyType<AdminCreateUserBody> },
+  TContext
+> => {
+  const mutationKey = ["adminCreateUser"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminCreateUser>>,
+    { data: BodyType<AdminCreateUserBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return adminCreateUser(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdminCreateUserMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminCreateUser>>
+>;
+export type AdminCreateUserMutationBody = BodyType<AdminCreateUserBody>;
+export type AdminCreateUserMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Pre-register a user (admin only)
+ */
+export const useAdminCreateUser = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminCreateUser>>,
+    TError,
+    { data: BodyType<AdminCreateUserBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof adminCreateUser>>,
+  TError,
+  { data: BodyType<AdminCreateUserBody> },
+  TContext
+> => {
+  return useMutation(getAdminCreateUserMutationOptions(options));
+};
 
 /**
  * @summary Get a user

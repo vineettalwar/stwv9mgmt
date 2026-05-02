@@ -83,14 +83,29 @@ export interface User {
   updatedAt: string;
 }
 
+/**
+ * All fields are optional hints. Identity (email, name, role) is always derived server-side from the Clerk auth token. Client-provided values are ignored for security.
+
+ */
 export interface CreateUserBody {
-  clerkUserId: string;
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+}
+
+/**
+ * Pre-register a user before they sign up. Email is required; the Clerk account will be linked automatically when the user first signs in.
+
+ */
+export interface AdminCreateUserBody {
   email: string;
   /** @nullable */
   firstName?: string | null;
   /** @nullable */
   lastName?: string | null;
-  role: string;
+  /** One of: admin, germany_accountant, india_accountant, project_manager, client, freelancer */
+  role?: string;
 }
 
 export interface UpdateUserBody {

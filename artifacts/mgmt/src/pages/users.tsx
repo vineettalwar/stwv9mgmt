@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListUsers } from "@workspace/api-client-react";
+import { useListUsers, useAdminCreateUser, getListUsersQueryKey } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { getListUsersQueryKey } from "@workspace/api-client-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,7 +34,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAuth } from "@clerk/react";
 
 const ROLE_STYLES: Record<string, { label: string; className: string }> = {
   admin: { label: "Admin", className: "bg-violet-100 text-violet-800 hover:bg-violet-100" },
@@ -73,45 +71,36 @@ type CreateUserValues = z.infer<typeof createUserSchema>;
 
 function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { getToken } = useAuth();
+  const { mutate: adminCreateUser, isPending } = useAdminCreateUser({
+    mutation: {
+      onSuccess: (_data, variables) => {
+        toast({ title: "User pre-registered", description: `${variables.data.email} will be assigned ${variables.data.role ?? "freelancer"} role on first sign-in.` });
+        form.reset();
+        setOpen(false);
+        onCreated();
+      },
+      onError: (err: unknown) => {
+        const message = (err as { message?: string })?.message ?? "Failed to create user";
+        toast({ title: "Error", description: message, variant: "destructive" });
+      },
+    },
+  });
 
   const form = useForm<CreateUserValues>({
     resolver: zodResolver(createUserSchema),
     defaultValues: { email: "", firstName: "", lastName: "", role: "freelancer" },
   });
 
-  async function onSubmit(values: CreateUserValues) {
-    setLoading(true);
-    try {
-      const token = await getToken();
-      const res = await fetch("/api/admin/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          email: values.email,
-          firstName: values.firstName || null,
-          lastName: values.lastName || null,
-          role: values.role,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Unknown error" }));
-        throw new Error(err.error ?? "Failed to create user");
-      }
-      toast({ title: "User pre-registered", description: `${values.email} will be assigned ${values.role} role on first sign-in.` });
-      form.reset();
-      setOpen(false);
-      onCreated();
-    } catch (err: unknown) {
-      toast({ title: "Error", description: err instanceof Error ? err.message : "Failed to create user", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
+  function onSubmit(values: CreateUserValues) {
+    adminCreateUser({
+      data: {
+        email: values.email,
+        firstName: values.firstName || null,
+        lastName: values.lastName || null,
+        role: values.role as "admin" | "germany_accountant" | "india_accountant" | "project_manager" | "client" | "freelancer",
+      },
+    });
   }
 
   return (
@@ -200,8 +189,8 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading} data-testid="button-submit-create-user">
-                {loading ? "Creating..." : "Create User"}
+              <Button type="submit" disabled={isPending} data-testid="button-submit-create-user">
+                {isPending ? "Creating..." : "Create User"}
               </Button>
             </div>
           </form>
