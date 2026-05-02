@@ -822,20 +822,22 @@ function ExpensesTab({ projectId, canEdit }: { projectId: number; canEdit: boole
                       </FormItem>
                     )} />
                   </div>
-                  <FormField control={form.control} name="isBillable" render={({ field }) => (
-                    <FormItem>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id="isBillable"
-                          checked={field.value}
-                          onChange={e => field.onChange(e.target.checked)}
-                          className="rounded"
-                        />
-                        <label htmlFor="isBillable" className="text-sm text-slate-700">Billable to client</label>
-                      </div>
-                    </FormItem>
-                  )} />
+                  {canEdit && (
+                    <FormField control={form.control} name="isBillable" render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="isBillable"
+                            checked={field.value}
+                            onChange={e => field.onChange(e.target.checked)}
+                            className="rounded"
+                          />
+                          <label htmlFor="isBillable" className="text-sm text-slate-700">Billable to client</label>
+                        </div>
+                      </FormItem>
+                    )} />
+                  )}
                   <div className="flex justify-end gap-2 pt-2">
                     <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
                     <Button type="submit" disabled={creating}>Log Expense</Button>

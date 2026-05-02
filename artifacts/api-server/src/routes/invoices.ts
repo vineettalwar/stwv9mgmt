@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, inArray, or } from "drizzle-orm";
+import { eq, and, inArray, or, isNull } from "drizzle-orm";
 import { z } from "zod";
 import PDFDocument from "pdfkit";
 import { pdfToBuffer } from "../lib/pdfBuffer";
@@ -198,6 +198,30 @@ router.post("/invoices", requireAuth, loadDbUser, async (req, res): Promise<void
   const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, invoiceData.companyId));
   if (!company) { res.status(400).json({ error: "Company not found" }); return; }
 
+  // Validate expenseIds before any writes — they must belong to the invoice project,
+  // be billable, and not already invoiced.
+  let validExpenseIds: number[] = [];
+  if (expenseIds.length > 0) {
+    if (!invoiceData.projectId) {
+      res.status(400).json({ error: "projectId is required when expenseIds are provided" });
+      return;
+    }
+    const validExpenses = await db.select({ id: expensesTable.id })
+      .from(expensesTable)
+      .where(and(
+        inArray(expensesTable.id, expenseIds),
+        eq(expensesTable.projectId, invoiceData.projectId),
+        eq(expensesTable.isBillable, true),
+        isNull(expensesTable.invoicedAt),
+      ));
+    validExpenseIds = validExpenses.map(e => e.id);
+    const invalidIds = expenseIds.filter(id => !validExpenseIds.includes(id));
+    if (invalidIds.length > 0) {
+      res.status(400).json({ error: `Invalid expenseIds: ${invalidIds.join(", ")} — must belong to project, be billable, and not yet invoiced` });
+      return;
+    }
+  }
+
   const taxType = invoiceData.taxType ?? determineTaxType(company.taxRegime, invoiceData.sellerState, invoiceData.buyerState);
   const taxRate = determineTaxRate(taxType);
   const totals = await computeTotals(lineItems, taxRate);
@@ -212,57 +236,40 @@ router.post("/invoices", requireAuth, loadDbUser, async (req, res): Promise<void
       ? addInterval(invoiceData.issueDate, invoiceData.recurringInterval)
       : null;
 
-  const [invoice] = await db.insert(invoicesTable).values({
-    ...invoiceData,
-    invoiceNumber,
-    taxType,
-    taxRate: taxRate.toFixed(2),
-    currency: invoiceData.currency ?? company.currency,
-    nextInvoiceDate: initialNextInvoiceDate,
-    createdBy: user.id,
-    ...totals,
-  }).returning();
+  const invoice = await db.transaction(async (tx) => {
+    const [newInvoice] = await tx.insert(invoicesTable).values({
+      ...invoiceData,
+      invoiceNumber,
+      taxType,
+      taxRate: taxRate.toFixed(2),
+      currency: invoiceData.currency ?? company.currency,
+      nextInvoiceDate: initialNextInvoiceDate,
+      createdBy: user.id,
+      ...totals,
+    }).returning();
 
-  if (lineItems.length > 0) {
-    await db.insert(invoiceLineItemsTable).values(
-      lineItems.map((li, idx) => ({
-        invoiceId: invoice.id,
-        timeEntryId: li.timeEntryId ?? null,
-        description: li.description,
-        quantity: li.quantity,
-        unitPrice: li.unitPrice,
-        amount: (parseFloat(li.quantity || "1") * parseFloat(li.unitPrice || "0")).toFixed(2),
-        sortOrder: li.sortOrder ?? idx,
-      }))
-    );
-  }
-
-  if (expenseIds.length > 0) {
-    if (!invoiceData.projectId) {
-      res.status(400).json({ error: "projectId is required when expenseIds are provided" });
-      return;
-    }
-    const validExpenses = await db.select({ id: expensesTable.id })
-      .from(expensesTable)
-      .where(
-        and(
-          inArray(expensesTable.id, expenseIds),
-          eq(expensesTable.projectId, invoiceData.projectId),
-          eq(expensesTable.isBillable, true),
-        )
+    if (lineItems.length > 0) {
+      await tx.insert(invoiceLineItemsTable).values(
+        lineItems.map((li, idx) => ({
+          invoiceId: newInvoice.id,
+          timeEntryId: li.timeEntryId ?? null,
+          description: li.description,
+          quantity: li.quantity,
+          unitPrice: li.unitPrice,
+          amount: (parseFloat(li.quantity || "1") * parseFloat(li.unitPrice || "0")).toFixed(2),
+          sortOrder: li.sortOrder ?? idx,
+        }))
       );
-    const validIds = validExpenses.map(e => e.id);
-    const invalidIds = expenseIds.filter(id => !validIds.includes(id));
-    if (invalidIds.length > 0) {
-      res.status(400).json({ error: `Invalid expenseIds: ${invalidIds.join(", ")} — must belong to project, be billable, and not yet invoiced` });
-      return;
     }
-    if (validIds.length > 0) {
-      await db.update(expensesTable)
+
+    if (validExpenseIds.length > 0) {
+      await tx.update(expensesTable)
         .set({ invoicedAt: new Date() })
-        .where(inArray(expensesTable.id, validIds));
+        .where(inArray(expensesTable.id, validExpenseIds));
     }
-  }
+
+    return newInvoice;
+  });
 
   const full = await getInvoiceWithDetails(invoice.id);
   res.status(201).json(full);

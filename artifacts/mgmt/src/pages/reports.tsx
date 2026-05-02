@@ -259,7 +259,7 @@ function ProfitabilityReport() {
       (acc, r) => ({
         invoiced: acc.invoiced + parseFloat(r.totalInvoiced),
         cost: acc.cost + parseFloat(r.totalCost),
-        expenseCost: acc.expenseCost + parseFloat((r as unknown as { totalExpenseCost?: string }).totalExpenseCost ?? "0"),
+        expenseCost: acc.expenseCost + parseFloat(r.totalExpenseCost ?? "0"),
         margin: acc.margin + parseFloat(r.margin),
       }),
       { invoiced: 0, cost: 0, expenseCost: 0, margin: 0 },
@@ -341,7 +341,7 @@ function ProfitabilityReport() {
               <TableBody>
                 {data.rows.map((r) => {
                   const margin = parseFloat(r.margin);
-                  const expCost = parseFloat((r as unknown as { totalExpenseCost?: string }).totalExpenseCost ?? "0");
+                  const expCost = parseFloat(r.totalExpenseCost ?? "0");
                   return (
                     <TableRow key={r.projectId} data-testid={`row-project-${r.projectId}`}>
                       <TableCell className="font-medium">{r.projectName}</TableCell>

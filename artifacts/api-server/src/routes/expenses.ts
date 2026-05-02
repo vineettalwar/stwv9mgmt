@@ -77,6 +77,7 @@ router.post("/projects/:id/expenses", requireAuth, loadDbUser, async (req, res):
   const [project] = await db.select({ id: projectsTable.id }).from(projectsTable).where(eq(projectsTable.id, projectId));
   if (!project) { res.status(404).json({ error: "Project not found" }); return; }
 
+  const canSetBillable = ADMIN_PM.includes(user.role);
   const [expense] = await db.insert(expensesTable).values({
     projectId,
     createdBy: user.id,
@@ -85,7 +86,7 @@ router.post("/projects/:id/expenses", requireAuth, loadDbUser, async (req, res):
     category: parsed.data.category ?? "other",
     description: parsed.data.description,
     date: parsed.data.date,
-    isBillable: parsed.data.isBillable ?? false,
+    isBillable: canSetBillable ? (parsed.data.isBillable ?? false) : false,
   }).returning();
 
   res.status(201).json(expense);
