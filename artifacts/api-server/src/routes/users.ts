@@ -98,9 +98,10 @@ async function provisionUserFromClerk(clerkId: string): Promise<typeof usersTabl
     throw Object.assign(new Error("Email already registered with a different Clerk account"), { status: 409 });
   }
 
-  // Create new user — role based on PLATFORM_ADMIN_EMAILS, defaulting to "freelancer"
+  // Create new user — admin if: in PLATFORM_ADMIN_EMAILS, OR is the very first user (bootstrap)
   const adminEmails = getAdminEmails();
-  const role = adminEmails.has(email.toLowerCase()) ? "admin" : "freelancer";
+  const existingCount = await db.select().from(usersTable).then(r => r.length);
+  const role = adminEmails.has(email.toLowerCase()) || existingCount === 0 ? "admin" : "freelancer";
 
   const [user] = await db.insert(usersTable)
     .values({ clerkUserId: clerkId, email, firstName, lastName, role, isActive: true })

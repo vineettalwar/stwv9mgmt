@@ -1109,6 +1109,33 @@ paths:
         "204":
           description: Deleted
 
+  /offers/{id}/pdf:
+    get:
+      operationId: getOfferPdf
+      tags: [offers]
+      summary: Download offer as PDF
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PDF file download
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /offers/{id}/convert-to-contract:
     post:
       operationId: convertOfferToContract
@@ -1233,6 +1260,33 @@ paths:
       responses:
         "204":
           description: Deleted
+
+  /contracts/{id}/pdf:
+    get:
+      operationId: getContractPdf
+      tags: [contracts]
+      summary: Download contract as PDF
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PDF file download
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /contract-templates:
     get:

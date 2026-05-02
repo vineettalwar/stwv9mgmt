@@ -1287,6 +1287,13 @@ export const DeleteOfferParams = zod.object({
 });
 
 /**
+ * @summary Download offer as PDF
+ */
+export const GetOfferPdfParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary Convert offer to contract
  */
 export const ConvertOfferToContractParams = zod.object({
@@ -1494,6 +1501,13 @@ export const UpdateContractResponse = zod.object({
  * @summary Delete a contract
  */
 export const DeleteContractParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Download contract as PDF
+ */
+export const GetContractPdfParams = zod.object({
   id: zod.coerce.number(),
 });
 

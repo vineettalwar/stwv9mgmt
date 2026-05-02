@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
+import PDFDocument from "pdfkit";
 import {
   db,
   offersTable,
@@ -208,6 +209,133 @@ router.delete("/offers/:id", requireAuth, loadDbUser, async (req, res): Promise<
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   await db.delete(offersTable).where(eq(offersTable.id, id));
   res.sendStatus(204);
+});
+
+// PDF export — server-side generated PDF for a single offer
+router.get("/offers/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise<void> => {
+  const user = req.dbUser!;
+  if (!["admin", "project_manager", "germany_accountant", "india_accountant"].includes(user.role)) {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
+  const id = parseInt(String(req.params.id));
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const offer = await getOfferWithDetails(id);
+  if (!offer) { res.status(404).json({ error: "Not found" }); return; }
+
+  function f(v: string | number | null | undefined): string {
+    return parseFloat(String(v ?? 0)).toFixed(2);
+  }
+  function clientName(): string {
+    if (!offer!.client) return "—";
+    return [offer!.client.firstName, offer!.client.lastName].filter(Boolean).join(" ") || offer!.client.email;
+  }
+
+  const doc = new PDFDocument({ margin: 50, size: "A4" });
+  const filename = `offer-${offer.offerNumber}.pdf`;
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  doc.pipe(res);
+
+  const cur = offer.currency ?? "EUR";
+  const BLUE = "#1e3a5f";
+  const GRAY = "#64748b";
+  const LIGHT = "#f1f5f9";
+
+  // Header bar
+  doc.rect(0, 0, doc.page.width, 80).fill(BLUE);
+  doc.fillColor("#ffffff").fontSize(22).font("Helvetica-Bold").text("OFFER", 50, 28);
+  doc.fontSize(10).font("Helvetica").text(offer.offerNumber, 50, 54);
+  doc.fillColor("#ffffff").fontSize(10).text(offer.status.toUpperCase(), doc.page.width - 150, 38, { width: 100, align: "right" });
+
+  // Company & Client columns
+  const colY = 110;
+  doc.fillColor(BLUE).fontSize(9).font("Helvetica-Bold").text("FROM", 50, colY);
+  doc.fillColor("#1e293b").fontSize(10).font("Helvetica-Bold").text(offer.company?.name ?? "—", 50, colY + 14);
+  let fromY = colY + 28;
+  if ((offer.company as unknown as { taxNumber?: string | null })?.taxNumber) {
+    doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(`Tax No: ${(offer.company as unknown as { taxNumber: string }).taxNumber}`, 50, fromY); fromY += 13;
+  }
+  if ((offer.company as unknown as { address?: string | null })?.address) {
+    const addr = (offer.company as unknown as { address: string }).address;
+    doc.fillColor(GRAY).fontSize(9).text(addr, 50, fromY, { width: 220 }); fromY += addr.split("\n").length * 13;
+  }
+
+  doc.fillColor(BLUE).fontSize(9).font("Helvetica-Bold").text("TO", 300, colY);
+  doc.fillColor("#1e293b").fontSize(10).font("Helvetica-Bold").text(clientName(), 300, colY + 14);
+  if (offer.client?.email) { doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(offer.client.email, 300, colY + 28); }
+  if (offer.project) { doc.fillColor(GRAY).fontSize(9).text(`Project: ${offer.project.name}`, 300, colY + 41); }
+
+  // Dates row
+  const datesY = Math.max(fromY, colY + 60) + 20;
+  doc.rect(50, datesY, doc.page.width - 100, 1).fill(LIGHT);
+  const dateBoxY = datesY + 10;
+  doc.fillColor(GRAY).fontSize(8).font("Helvetica-Bold").text("OFFER DATE", 50, dateBoxY);
+  doc.fillColor("#1e293b").fontSize(10).font("Helvetica").text(new Date(offer.createdAt).toLocaleDateString("en-GB"), 50, dateBoxY + 12);
+  if (offer.validUntil) {
+    doc.fillColor(GRAY).fontSize(8).font("Helvetica-Bold").text("VALID UNTIL", 180, dateBoxY);
+    doc.fillColor("#1e293b").fontSize(10).font("Helvetica").text(offer.validUntil, 180, dateBoxY + 12);
+  }
+
+  // Subject
+  const subjectY = dateBoxY + 40;
+  doc.fillColor(BLUE).fontSize(9).font("Helvetica-Bold").text("SUBJECT", 50, subjectY);
+  doc.fillColor("#1e293b").fontSize(12).font("Helvetica-Bold").text(offer.title, 50, subjectY + 12);
+
+  // Line items table
+  const tableY = subjectY + 40;
+  const colWidths = [260, 60, 90, 90];
+  const colXs = [50, 310, 370, 460];
+
+  doc.rect(50, tableY, doc.page.width - 100, 20).fill(BLUE);
+  const headers = ["Description", "Qty", "Unit Price", "Amount"];
+  headers.forEach((h, i) => {
+    doc.fillColor("#ffffff").fontSize(8).font("Helvetica-Bold").text(h, colXs[i], tableY + 6, { width: colWidths[i], align: i > 0 ? "right" : "left" });
+  });
+
+  let rowY = tableY + 24;
+  const lineItems = offer.lineItems ?? [];
+  lineItems.forEach((li, idx) => {
+    if (idx % 2 === 0) doc.rect(50, rowY - 2, doc.page.width - 100, 18).fill("#f8fafc");
+    const amount = (parseFloat(String(li.quantity)) * parseFloat(String(li.unitPrice))).toFixed(2);
+    doc.fillColor("#334155").fontSize(9).font("Helvetica").text(li.description, colXs[0], rowY, { width: colWidths[0] });
+    doc.text(String(li.quantity), colXs[1], rowY, { width: colWidths[1], align: "right" });
+    doc.text(`${cur} ${f(li.unitPrice)}`, colXs[2], rowY, { width: colWidths[2], align: "right" });
+    doc.text(`${cur} ${f(amount)}`, colXs[3], rowY, { width: colWidths[3], align: "right" });
+    rowY += 20;
+  });
+
+  // Totals
+  const totalsX = 370;
+  const totalsWidth = 140;
+  rowY += 10;
+  doc.rect(50, rowY, doc.page.width - 100, 1).fill(LIGHT);
+  rowY += 8;
+
+  doc.fillColor(GRAY).fontSize(9).font("Helvetica").text("Subtotal", totalsX, rowY, { width: totalsWidth, align: "left" });
+  doc.fillColor("#1e293b").text(`${cur} ${f(offer.subtotal)}`, totalsX, rowY, { width: totalsWidth, align: "right" });
+  rowY += 16;
+
+  const taxAmt = parseFloat(f(offer.taxAmount));
+  if (taxAmt > 0) {
+    doc.fillColor(GRAY).fontSize(9).font("Helvetica").text("Tax", totalsX, rowY, { width: totalsWidth, align: "left" });
+    doc.fillColor("#1e293b").text(`${cur} ${f(offer.taxAmount)}`, totalsX, rowY, { width: totalsWidth, align: "right" });
+    rowY += 16;
+  }
+
+  rowY += 6;
+  doc.rect(totalsX, rowY, totalsWidth, 1).fill(BLUE);
+  rowY += 6;
+  doc.fillColor(BLUE).fontSize(11).font("Helvetica-Bold").text("Total", totalsX, rowY, { width: totalsWidth, align: "left" });
+  doc.text(`${cur} ${f(offer.totalAmount)}`, totalsX, rowY, { width: totalsWidth, align: "right" });
+
+  if (offer.notes) {
+    rowY += 36;
+    doc.fillColor(BLUE).fontSize(9).font("Helvetica-Bold").text("NOTES", 50, rowY);
+    doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(offer.notes, 50, rowY + 12, { width: doc.page.width - 100 });
+  }
+
+  doc.end();
 });
 
 // CONVERT offer to contract

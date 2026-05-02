@@ -48,7 +48,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Plus, FileText, Trash2, RefreshCw, Download, ArrowRightLeft } from "lucide-react";
-import { generateOfferPdf } from "@/lib/pdf-generator";
+import { useAuth } from "@clerk/react";
 
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-slate-100 text-slate-600" },
@@ -263,10 +263,24 @@ function OfferCard({ offer, onRefresh }: { offer: OfferType; onRefresh: () => vo
   const client = (offer as unknown as { client?: { email: string; firstName?: string | null; lastName?: string | null } | null }).client;
   const project = (offer as unknown as { project?: { id: number; name: string } | null }).project;
   const company = (offer as unknown as { company?: { name: string } | null }).company;
+  const { getToken } = useAuth();
 
-  function handleDownloadPdf() {
-    generateOfferPdf(offer as unknown as Parameters<typeof generateOfferPdf>[0]);
-    toast({ title: "PDF generated" });
+  async function handleDownloadPdf() {
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/offers/${offer.id}/pdf`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href; a.download = `offer-${offer.offerNumber}.pdf`; a.click();
+      URL.revokeObjectURL(href);
+      toast({ title: "PDF downloaded" });
+    } catch {
+      toast({ title: "PDF download failed", variant: "destructive" });
+    }
   }
 
   return (

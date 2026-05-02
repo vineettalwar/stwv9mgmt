@@ -4214,6 +4214,93 @@ export const useDeleteOffer = <
 };
 
 /**
+ * @summary Download offer as PDF
+ */
+export const getGetOfferPdfUrl = (id: number) => {
+  return `/api/offers/${id}/pdf`;
+};
+
+export const getOfferPdf = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetOfferPdfUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetOfferPdfQueryKey = (id: number) => {
+  return [`/api/offers/${id}/pdf`] as const;
+};
+
+export const getGetOfferPdfQueryOptions = <
+  TData = Awaited<ReturnType<typeof getOfferPdf>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOfferPdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetOfferPdfQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getOfferPdf>>> = ({
+    signal,
+  }) => getOfferPdf(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getOfferPdf>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetOfferPdfQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getOfferPdf>>
+>;
+export type GetOfferPdfQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Download offer as PDF
+ */
+
+export function useGetOfferPdf<
+  TData = Awaited<ReturnType<typeof getOfferPdf>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOfferPdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetOfferPdfQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary Convert offer to contract
  */
 export const getConvertOfferToContractUrl = (id: number) => {
@@ -4718,6 +4805,93 @@ export const useDeleteContract = <
 > => {
   return useMutation(getDeleteContractMutationOptions(options));
 };
+
+/**
+ * @summary Download contract as PDF
+ */
+export const getGetContractPdfUrl = (id: number) => {
+  return `/api/contracts/${id}/pdf`;
+};
+
+export const getContractPdf = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetContractPdfUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetContractPdfQueryKey = (id: number) => {
+  return [`/api/contracts/${id}/pdf`] as const;
+};
+
+export const getGetContractPdfQueryOptions = <
+  TData = Awaited<ReturnType<typeof getContractPdf>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getContractPdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetContractPdfQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getContractPdf>>> = ({
+    signal,
+  }) => getContractPdf(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getContractPdf>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetContractPdfQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getContractPdf>>
+>;
+export type GetContractPdfQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Download contract as PDF
+ */
+
+export function useGetContractPdf<
+  TData = Awaited<ReturnType<typeof getContractPdf>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getContractPdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetContractPdfQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List contract templates

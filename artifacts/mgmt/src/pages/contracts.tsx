@@ -46,7 +46,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Plus, FileSignature, Trash2, Download, CheckCircle, Eye } from "lucide-react";
-import { generateContractPdf } from "@/lib/pdf-generator";
+import { useAuth } from "@clerk/react";
 
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-slate-100 text-slate-600" },
@@ -279,10 +279,24 @@ function ContractCard({ contract }: { contract: ContractType }) {
   const client = (contract as unknown as { client?: { email: string; firstName?: string | null; lastName?: string | null } | null }).client;
   const project = (contract as unknown as { project?: { id: number; name: string } | null }).project;
   const company = (contract as unknown as { company?: { name: string } | null }).company;
+  const { getToken } = useAuth();
 
-  function handleDownloadPdf() {
-    generateContractPdf(contract as unknown as Parameters<typeof generateContractPdf>[0]);
-    toast({ title: "PDF generated" });
+  async function handleDownloadPdf() {
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/contracts/${contract.id}/pdf`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href; a.download = `contract-${contract.contractNumber}.pdf`; a.click();
+      URL.revokeObjectURL(href);
+      toast({ title: "PDF downloaded" });
+    } catch {
+      toast({ title: "PDF download failed", variant: "destructive" });
+    }
   }
 
   return (

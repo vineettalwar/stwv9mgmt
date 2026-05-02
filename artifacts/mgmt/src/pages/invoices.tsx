@@ -49,7 +49,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Receipt, Trash2, Download, CheckCircle, Send, RefreshCw, ExternalLink } from "lucide-react";
 import { useLocation } from "wouter";
-import { generateInvoicePdf } from "@/lib/pdf-generator";
+import { useAuth } from "@clerk/react";
 
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-slate-100 text-slate-600" },
@@ -407,10 +407,24 @@ function InvoiceCard({ invoice }: { invoice: InvoiceType }) {
   const client = (invoice as unknown as { client?: { email: string; firstName?: string | null; lastName?: string | null } | null }).client;
   const project = (invoice as unknown as { project?: { id: number; name: string } | null }).project;
   const company = (invoice as unknown as { company?: { name: string } | null }).company;
+  const { getToken } = useAuth();
 
-  function handleDownloadPdf() {
-    generateInvoicePdf(invoice as unknown as Parameters<typeof generateInvoicePdf>[0]);
-    toast({ title: "PDF generated" });
+  async function handleDownloadPdf() {
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/invoices/${invoice.id}/pdf`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href; a.download = `invoice-${invoice.invoiceNumber}.pdf`; a.click();
+      URL.revokeObjectURL(href);
+      toast({ title: "PDF downloaded" });
+    } catch {
+      toast({ title: "PDF download failed", variant: "destructive" });
+    }
   }
 
   const taxLabel = TAX_TYPE_LABELS[invoice.taxType] ?? invoice.taxType;
