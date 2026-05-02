@@ -4,7 +4,8 @@
  * Seeds:
  *   1. user_roles reference table (6 platform roles)
  *   2. companies (4 STWV entities — idempotent via unique name constraint)
- *   3. Default admin user (optional — requires env vars, see below)
+ *   3. Test accounts (6 pre-registered dev accounts using @stwv-dev.com)
+ *   4. Default admin user (optional — requires env vars, see below)
  *
  * ADMIN USER BOOTSTRAP
  * ─────────────────────
@@ -105,8 +106,42 @@ async function seed() {
     }
   }
 
-  // ── 3. Default admin user (optional) ──────────────────────────────────────
-  console.log("\n3. Default admin user…");
+  // ── 3. Test accounts (development only) ────────────────────────────────────
+  // These accounts use pending:email placeholders so they are linked when a
+  // developer signs up through Clerk using the matching email address.
+  // Domain: stwv-dev.com — a valid TLD accepted by Clerk.
+  const testUsers: Array<{ email: string; firstName: string; lastName: string | null; role: typeof usersTable.$inferInsert["role"] }> = [
+    { email: "admin@stwv-dev.com",       firstName: "Test",  lastName: "Admin",      role: "admin" },
+    { email: "pm@stwv-dev.com",          firstName: "Test",  lastName: "PM",         role: "project_manager" },
+    { email: "client@stwv-dev.com",      firstName: "Test",  lastName: "Client",     role: "client" },
+    { email: "freelancer@stwv-dev.com",  firstName: "Test",  lastName: "Freelancer", role: "freelancer" },
+    { email: "de-acct@stwv-dev.com",     firstName: "Test",  lastName: "DE Acct",    role: "germany_accountant" },
+    { email: "in-acct@stwv-dev.com",     firstName: "Test",  lastName: "IN Acct",    role: "india_accountant" },
+  ];
+
+  console.log("\n3. Seeding test accounts…");
+  for (const u of testUsers) {
+    const result = await db
+      .insert(usersTable)
+      .values({
+        clerkUserId: `pending:${u.email}`,
+        email: u.email,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        role: u.role,
+        isActive: true,
+      })
+      .onConflictDoNothing()
+      .returning({ id: usersTable.id, email: usersTable.email });
+    if (result.length > 0) {
+      console.log(`   Inserted: ${u.email} (${u.role})`);
+    } else {
+      console.log(`   Skipped (exists): ${u.email}`);
+    }
+  }
+
+  // ── 4. Default admin user (optional) ──────────────────────────────────────
+  console.log("\n4. Default admin user…");
   const adminClerkId = process.env.PLATFORM_ADMIN_CLERK_ID?.trim();
   const adminEmail = process.env.PLATFORM_ADMIN_EMAIL?.trim();
 
