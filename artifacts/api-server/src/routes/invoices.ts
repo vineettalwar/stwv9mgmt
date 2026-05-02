@@ -439,17 +439,19 @@ router.post("/invoices/:id/send", requireAuth, loadDbUser, async (req, res): Pro
     });
     await db.transaction(async (tx) => {
       await tx.update(invoicesTable).set({ status: "sent", updatedAt: new Date() }).where(eq(invoicesTable.id, id));
-      await logAuditTx(tx, {
-        actorId: user.id,
-        actorRole: user.role,
-        action: "sent",
-        entityType: "invoice",
-        entityId: id,
-        entityLabel: invoice.invoiceNumber,
-        oldValue: { status: invoice.status },
-        newValue: { status: "sent" },
-        projectId: invoice.projectId ?? null,
-      });
+      if (invoice.status !== "sent") {
+        await logAuditTx(tx, {
+          actorId: user.id,
+          actorRole: user.role,
+          action: "sent",
+          entityType: "invoice",
+          entityId: id,
+          entityLabel: invoice.invoiceNumber,
+          oldValue: { status: invoice.status },
+          newValue: { status: "sent" },
+          projectId: invoice.projectId ?? null,
+        });
+      }
     });
     res.json({ success: true, email: invoice.client.email });
   } catch (err) {

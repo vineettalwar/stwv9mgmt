@@ -2313,7 +2313,7 @@ components:
           type: ["string", "null"]
         status:
           type: string
-          description: "One of: active, completed, on_hold, archived"
+          description: "One of: active, completed, on_hold (use POST /projects/:id/archive to archive)"
         billingModel:
           type: string
           description: "One of: hourly, fixed, retainer"
@@ -2344,6 +2344,7 @@ components:
           type: ["string", "null"]
         status:
           type: string
+          description: "One of: active, completed, on_hold (use POST /projects/:id/archive to archive)"
         billingModel:
           type: string
         fixedAllocationHours:

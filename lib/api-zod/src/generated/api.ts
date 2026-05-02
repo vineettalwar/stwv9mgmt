@@ -479,7 +479,9 @@ export const CreateProjectBody = zod.object({
   status: zod
     .string()
     .optional()
-    .describe("One of: active, completed, on_hold, archived"),
+    .describe(
+      "One of: active, completed, on_hold (use POST \/projects\/:id\/archive to archive)",
+    ),
   billingModel: zod.string().describe("One of: hourly, fixed, retainer"),
   fixedAllocationHours: zod.string().nullish(),
   startDate: zod.string().nullish(),
@@ -546,7 +548,12 @@ export const UpdateProjectBody = zod.object({
   companyId: zod.number().optional(),
   clientId: zod.number().nullish(),
   description: zod.string().nullish(),
-  status: zod.string().optional(),
+  status: zod
+    .string()
+    .optional()
+    .describe(
+      "One of: active, completed, on_hold (use POST \/projects\/:id\/archive to archive)",
+    ),
   billingModel: zod.string().optional(),
   fixedAllocationHours: zod.string().nullish(),
   startDate: zod.string().nullish(),

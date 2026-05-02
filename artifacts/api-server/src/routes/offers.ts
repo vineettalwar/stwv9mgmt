@@ -448,17 +448,19 @@ router.post("/offers/:id/send", requireAuth, loadDbUser, async (req, res): Promi
     });
     await db.transaction(async (tx) => {
       await tx.update(offersTable).set({ status: "sent", updatedAt: new Date() }).where(eq(offersTable.id, id));
-      await logAuditTx(tx, {
-        actorId: user.id,
-        actorRole: user.role,
-        action: "sent",
-        entityType: "offer",
-        entityId: id,
-        entityLabel: offer.offerNumber,
-        oldValue: { status: offer.status },
-        newValue: { status: "sent" },
-        projectId: offer.projectId ?? null,
-      });
+      if (offer.status !== "sent") {
+        await logAuditTx(tx, {
+          actorId: user.id,
+          actorRole: user.role,
+          action: "sent",
+          entityType: "offer",
+          entityId: id,
+          entityLabel: offer.offerNumber,
+          oldValue: { status: offer.status },
+          newValue: { status: "sent" },
+          projectId: offer.projectId ?? null,
+        });
+      }
     });
     res.json({ success: true, email: offer.client.email });
   } catch (err) {

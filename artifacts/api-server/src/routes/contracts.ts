@@ -312,17 +312,19 @@ router.post("/contracts/:id/send", requireAuth, loadDbUser, async (req, res): Pr
     });
     await db.transaction(async (tx) => {
       await tx.update(contractsTable).set({ status: "sent", updatedAt: new Date() }).where(eq(contractsTable.id, id));
-      await logAuditTx(tx, {
-        actorId: user.id,
-        actorRole: user.role,
-        action: "sent",
-        entityType: "contract",
-        entityId: id,
-        entityLabel: contract.contractNumber,
-        oldValue: { status: contract.status },
-        newValue: { status: "sent" },
-        projectId: contract.projectId ?? null,
-      });
+      if (contract.status !== "sent") {
+        await logAuditTx(tx, {
+          actorId: user.id,
+          actorRole: user.role,
+          action: "sent",
+          entityType: "contract",
+          entityId: id,
+          entityLabel: contract.contractNumber,
+          oldValue: { status: contract.status },
+          newValue: { status: "sent" },
+          projectId: contract.projectId ?? null,
+        });
+      }
     });
     res.json({ success: true, email: contract.client.email });
   } catch (err) {

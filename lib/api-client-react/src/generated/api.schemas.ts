@@ -197,7 +197,7 @@ export interface CreateProjectBody {
   clientId?: number | null;
   /** @nullable */
   description?: string | null;
-  /** One of: active, completed, on_hold, archived */
+  /** One of: active, completed, on_hold (use POST /projects/:id/archive to archive) */
   status?: string;
   /** One of: hourly, fixed, retainer */
   billingModel: string;
@@ -217,6 +217,7 @@ export interface UpdateProjectBody {
   clientId?: number | null;
   /** @nullable */
   description?: string | null;
+  /** One of: active, completed, on_hold (use POST /projects/:id/archive to archive) */
   status?: string;
   billingModel?: string;
   /** @nullable */
