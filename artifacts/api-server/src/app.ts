@@ -66,8 +66,11 @@ app.use(
       // Allow server-to-server requests (no Origin header)
       if (!origin) { callback(null, true); return; }
       if (allowedOrigins.has(origin)) { callback(null, true); return; }
-      // Allow any replit.dev subdomain (proxied preview pane requests)
-      if (/^https:\/\/[a-z0-9-]+\.replit\.dev$/.test(origin)) { callback(null, true); return; }
+      // In development only: allow any *.replit.dev subdomain (proxied Replit preview pane).
+      // In production, only explicitly configured origins (FRONTEND_URL + REPLIT_DEV_DOMAIN) are accepted.
+      if (process.env.NODE_ENV !== "production" && /^https:\/\/[a-z0-9-]+\.replit\.dev$/.test(origin)) {
+        callback(null, true); return;
+      }
       callback(new Error(`CORS: origin not allowed — ${origin}`));
     },
   }),
