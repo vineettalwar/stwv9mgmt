@@ -223,12 +223,16 @@ router.get("/offers/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise
   const offer = await getOfferWithDetails(id);
   if (!offer) { res.status(404).json({ error: "Not found" }); return; }
 
+  const company = offer.company; // typed as Company (taxNumber, address, bankDetails, logoUrl, taxRegime)
+  const client = offer.client;   // typed as { id, email, firstName, lastName, role } | null
+  const project = offer.project;
+
   function f(v: string | number | null | undefined): string {
     return parseFloat(String(v ?? 0)).toFixed(2);
   }
   function clientName(): string {
-    if (!offer!.client) return "—";
-    return [offer!.client.firstName, offer!.client.lastName].filter(Boolean).join(" ") || offer!.client.email;
+    if (!client) return "—";
+    return [client.firstName, client.lastName].filter(Boolean).join(" ") || client.email;
   }
 
   const doc = new PDFDocument({ margin: 50, size: "A4" });
@@ -248,23 +252,34 @@ router.get("/offers/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise
   doc.fontSize(10).font("Helvetica").text(offer.offerNumber, 50, 54);
   doc.fillColor("#ffffff").fontSize(10).text(offer.status.toUpperCase(), doc.page.width - 150, 38, { width: 100, align: "right" });
 
+  // Company logo (top-right of header, if available)
+  if (company?.logoUrl) {
+    try {
+      const logoRes = await fetch(company.logoUrl);
+      if (logoRes.ok) {
+        const logoBuf = Buffer.from(await logoRes.arrayBuffer());
+        doc.image(logoBuf, doc.page.width - 180, 10, { fit: [120, 60] });
+      }
+    } catch { /* logo unavailable — skip */ }
+  }
+
   // Company & Client columns
   const colY = 110;
   doc.fillColor(BLUE).fontSize(9).font("Helvetica-Bold").text("FROM", 50, colY);
-  doc.fillColor("#1e293b").fontSize(10).font("Helvetica-Bold").text(offer.company?.name ?? "—", 50, colY + 14);
+  doc.fillColor("#1e293b").fontSize(10).font("Helvetica-Bold").text(company?.name ?? "—", 50, colY + 14);
   let fromY = colY + 28;
-  if ((offer.company as unknown as { taxNumber?: string | null })?.taxNumber) {
-    doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(`Tax No: ${(offer.company as unknown as { taxNumber: string }).taxNumber}`, 50, fromY); fromY += 13;
+  if (company?.taxNumber) {
+    doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(`Tax No: ${company.taxNumber}`, 50, fromY); fromY += 13;
   }
-  if ((offer.company as unknown as { address?: string | null })?.address) {
-    const addr = (offer.company as unknown as { address: string }).address;
-    doc.fillColor(GRAY).fontSize(9).text(addr, 50, fromY, { width: 220 }); fromY += addr.split("\n").length * 13;
+  if (company?.address) {
+    doc.fillColor(GRAY).fontSize(9).text(company.address, 50, fromY, { width: 220 });
+    fromY += company.address.split("\n").length * 13;
   }
 
   doc.fillColor(BLUE).fontSize(9).font("Helvetica-Bold").text("TO", 300, colY);
   doc.fillColor("#1e293b").fontSize(10).font("Helvetica-Bold").text(clientName(), 300, colY + 14);
-  if (offer.client?.email) { doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(offer.client.email, 300, colY + 28); }
-  if (offer.project) { doc.fillColor(GRAY).fontSize(9).text(`Project: ${offer.project.name}`, 300, colY + 41); }
+  if (client?.email) { doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(client.email, 300, colY + 28); }
+  if (project) { doc.fillColor(GRAY).fontSize(9).text(`Project: ${project.name}`, 300, colY + 41); }
 
   // Dates row
   const datesY = Math.max(fromY, colY + 60) + 20;
@@ -288,8 +303,8 @@ router.get("/offers/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise
   const colXs = [50, 310, 370, 460];
 
   doc.rect(50, tableY, doc.page.width - 100, 20).fill(BLUE);
-  const headers = ["Description", "Qty", "Unit Price", "Amount"];
-  headers.forEach((h, i) => {
+  const tableHeaders = ["Description", "Qty", "Unit Price", "Amount"];
+  tableHeaders.forEach((h, i) => {
     doc.fillColor("#ffffff").fontSize(8).font("Helvetica-Bold").text(h, colXs[i], tableY + 6, { width: colWidths[i], align: i > 0 ? "right" : "left" });
   });
 
@@ -305,7 +320,7 @@ router.get("/offers/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise
     rowY += 20;
   });
 
-  // Totals
+  // Totals — VAT/GST-specific breakdown matching invoice format
   const totalsX = 370;
   const totalsWidth = 140;
   rowY += 10;
@@ -317,10 +332,29 @@ router.get("/offers/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise
   rowY += 16;
 
   const taxAmt = parseFloat(f(offer.taxAmount));
+  const taxRegime = company?.taxRegime ?? "none";
   if (taxAmt > 0) {
-    doc.fillColor(GRAY).fontSize(9).font("Helvetica").text("Tax", totalsX, rowY, { width: totalsWidth, align: "left" });
-    doc.fillColor("#1e293b").text(`${cur} ${f(offer.taxAmount)}`, totalsX, rowY, { width: totalsWidth, align: "right" });
-    rowY += 16;
+    if (taxRegime === "vat") {
+      doc.fillColor(GRAY).fontSize(9).font("Helvetica").text("MwSt 19% (VAT)", totalsX, rowY, { width: totalsWidth, align: "left" });
+      doc.fillColor("#1e293b").text(`${cur} ${f(offer.taxAmount)}`, totalsX, rowY, { width: totalsWidth, align: "right" });
+      rowY += 16;
+    } else if (taxRegime === "gst") {
+      const half = (taxAmt / 2).toFixed(2);
+      doc.fillColor(GRAY).fontSize(9).font("Helvetica").text("CGST (9%)", totalsX, rowY, { width: totalsWidth, align: "left" });
+      doc.fillColor("#1e293b").text(`${cur} ${half}`, totalsX, rowY, { width: totalsWidth, align: "right" });
+      rowY += 14;
+      doc.fillColor(GRAY).font("Helvetica").text("SGST (9%)", totalsX, rowY, { width: totalsWidth, align: "left" });
+      doc.fillColor("#1e293b").text(`${cur} ${half}`, totalsX, rowY, { width: totalsWidth, align: "right" });
+      rowY += 14;
+    } else if (taxRegime === "igst") {
+      doc.fillColor(GRAY).fontSize(9).font("Helvetica").text("IGST 18%", totalsX, rowY, { width: totalsWidth, align: "left" });
+      doc.fillColor("#1e293b").text(`${cur} ${f(offer.taxAmount)}`, totalsX, rowY, { width: totalsWidth, align: "right" });
+      rowY += 16;
+    } else {
+      doc.fillColor(GRAY).fontSize(9).font("Helvetica").text("Tax", totalsX, rowY, { width: totalsWidth, align: "left" });
+      doc.fillColor("#1e293b").text(`${cur} ${f(offer.taxAmount)}`, totalsX, rowY, { width: totalsWidth, align: "right" });
+      rowY += 16;
+    }
   }
 
   rowY += 6;
@@ -328,11 +362,29 @@ router.get("/offers/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise
   rowY += 6;
   doc.fillColor(BLUE).fontSize(11).font("Helvetica-Bold").text("Total", totalsX, rowY, { width: totalsWidth, align: "left" });
   doc.text(`${cur} ${f(offer.totalAmount)}`, totalsX, rowY, { width: totalsWidth, align: "right" });
+  rowY += 28;
 
+  // Notes
   if (offer.notes) {
-    rowY += 36;
+    doc.rect(50, rowY, doc.page.width - 100, 1).fill(LIGHT);
+    rowY += 10;
     doc.fillColor(BLUE).fontSize(9).font("Helvetica-Bold").text("NOTES", 50, rowY);
     doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(offer.notes, 50, rowY + 12, { width: doc.page.width - 100 });
+    rowY += 24 + (offer.notes.split("\n").length * 12);
+  }
+
+  // Payment Terms
+  doc.rect(50, rowY, doc.page.width - 100, 1).fill(LIGHT);
+  rowY += 10;
+  doc.fillColor(BLUE).fontSize(9).font("Helvetica-Bold").text("PAYMENT TERMS", 50, rowY);
+  rowY += 12;
+  const paymentText = taxRegime === "vat"
+    ? "Invoices are due within 30 days of issuance. Late payments accrue interest per §288 BGB."
+    : "Invoices are due within 30 days of issuance.";
+  doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(paymentText, 50, rowY, { width: doc.page.width - 100 });
+  rowY += 14;
+  if (company?.bankDetails) {
+    doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(`Bank: ${company.bankDetails}`, 50, rowY, { width: doc.page.width - 100 });
   }
 
   doc.end();

@@ -151,9 +151,13 @@ router.get("/contracts/:id/pdf", requireAuth, loadDbUser, async (req, res): Prom
   const contract = await getContractWithDetails(id);
   if (!contract) { res.status(404).json({ error: "Not found" }); return; }
 
+  const company = contract.company; // typed as Company (taxNumber, address, bankDetails, logoUrl)
+  const client = contract.client;   // typed as { id, email, firstName, lastName, role } | null
+  const project = contract.project;
+
   function partyName(): string {
-    if (!contract!.client) return "—";
-    return [contract!.client.firstName, contract!.client.lastName].filter(Boolean).join(" ") || contract!.client.email;
+    if (!client) return "—";
+    return [client.firstName, client.lastName].filter(Boolean).join(" ") || client.email;
   }
 
   const doc = new PDFDocument({ margin: 50, size: "A4" });
@@ -165,7 +169,10 @@ router.get("/contracts/:id/pdf", requireAuth, loadDbUser, async (req, res): Prom
   const BLUE = "#1e3a5f";
   const GRAY = "#64748b";
   const LIGHT = "#f1f5f9";
-  const TYPE_LABELS: Record<string, string> = { client_service: "Client Service Agreement", freelancer_service: "Freelancer Service Agreement" };
+  const TYPE_LABELS: Record<string, string> = {
+    client_service: "Client Service Agreement",
+    freelancer_service: "Freelancer Service Agreement",
+  };
 
   // Header bar
   doc.rect(0, 0, doc.page.width, 80).fill(BLUE);
@@ -173,23 +180,34 @@ router.get("/contracts/:id/pdf", requireAuth, loadDbUser, async (req, res): Prom
   doc.fontSize(10).font("Helvetica").text(contract.contractNumber, 50, 54);
   doc.fillColor("#ffffff").fontSize(10).text(contract.status.toUpperCase(), doc.page.width - 150, 38, { width: 100, align: "right" });
 
+  // Company logo (top-right of header, if available)
+  if (company?.logoUrl) {
+    try {
+      const logoRes = await fetch(company.logoUrl);
+      if (logoRes.ok) {
+        const logoBuf = Buffer.from(await logoRes.arrayBuffer());
+        doc.image(logoBuf, doc.page.width - 180, 10, { fit: [120, 60] });
+      }
+    } catch { /* logo unavailable — skip */ }
+  }
+
   // Company & Party columns
   const colY = 110;
   doc.fillColor(BLUE).fontSize(9).font("Helvetica-Bold").text("COMPANY", 50, colY);
-  doc.fillColor("#1e293b").fontSize(10).font("Helvetica-Bold").text(contract.company?.name ?? "—", 50, colY + 14);
+  doc.fillColor("#1e293b").fontSize(10).font("Helvetica-Bold").text(company?.name ?? "—", 50, colY + 14);
   let fromY = colY + 28;
-  if ((contract.company as unknown as { taxNumber?: string | null })?.taxNumber) {
-    doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(`Tax No: ${(contract.company as unknown as { taxNumber: string }).taxNumber}`, 50, fromY); fromY += 13;
+  if (company?.taxNumber) {
+    doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(`Tax No: ${company.taxNumber}`, 50, fromY); fromY += 13;
   }
-  if ((contract.company as unknown as { address?: string | null })?.address) {
-    const addr = (contract.company as unknown as { address: string }).address;
-    doc.fillColor(GRAY).fontSize(9).text(addr, 50, fromY, { width: 220 }); fromY += addr.split("\n").length * 13;
+  if (company?.address) {
+    doc.fillColor(GRAY).fontSize(9).text(company.address, 50, fromY, { width: 220 });
+    fromY += company.address.split("\n").length * 13;
   }
 
   doc.fillColor(BLUE).fontSize(9).font("Helvetica-Bold").text("PARTY", 300, colY);
   doc.fillColor("#1e293b").fontSize(10).font("Helvetica-Bold").text(partyName(), 300, colY + 14);
-  if (contract.client?.email) { doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(contract.client.email, 300, colY + 28); }
-  if (contract.project) { doc.fillColor(GRAY).fontSize(9).text(`Project: ${contract.project.name}`, 300, colY + 41); }
+  if (client?.email) { doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(client.email, 300, colY + 28); }
+  if (project) { doc.fillColor(GRAY).fontSize(9).text(`Project: ${project.name}`, 300, colY + 41); }
 
   // Dates row
   const datesY = Math.max(fromY, colY + 60) + 20;
@@ -215,15 +233,28 @@ router.get("/contracts/:id/pdf", requireAuth, loadDbUser, async (req, res): Prom
   doc.fillColor(BLUE).fontSize(9).font("Helvetica-Bold").text("TITLE", 50, titleY);
   doc.fillColor("#1e293b").fontSize(12).font("Helvetica-Bold").text(contract.title, 50, titleY + 12);
 
-  // Divider
+  // Divider + Contract body
   const contentY = titleY + 40;
   doc.rect(50, contentY, doc.page.width - 100, 1).fill(LIGHT);
-
-  // Contract body content
   const bodyY = contentY + 12;
-  const rawContent = (contract as unknown as { content: string }).content ?? "";
-  const cleanContent = rawContent.replace(/^#{1,3}\s+/gm, "").replace(/\*\*(.*?)\*\*/g, "$1").replace(/\*(.*?)\*/g, "$1");
+  // contract.content is directly typed on contractsTable.$inferSelect
+  const cleanContent = contract.content
+    .replace(/^#{1,3}\s+/gm, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1");
   doc.fillColor("#1e293b").fontSize(9).font("Helvetica").text(cleanContent, 50, bodyY, { width: doc.page.width - 100, lineGap: 3 });
+
+  // Payment Terms & Bank Details
+  const paymentY = doc.y + 20;
+  doc.rect(50, paymentY, doc.page.width - 100, 1).fill(LIGHT);
+  doc.fillColor(BLUE).fontSize(9).font("Helvetica-Bold").text("PAYMENT TERMS", 50, paymentY + 10);
+  const payTerms = company?.taxRegime === "vat"
+    ? "Invoices are due within 30 days of issuance. Late payments accrue interest per §288 BGB."
+    : "Invoices are due within 30 days of issuance.";
+  doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(payTerms, 50, paymentY + 22, { width: doc.page.width - 100 });
+  if (company?.bankDetails) {
+    doc.fillColor(GRAY).fontSize(9).text(`Bank: ${company.bankDetails}`, 50, doc.y + 6, { width: doc.page.width - 100 });
+  }
 
   doc.end();
 });
