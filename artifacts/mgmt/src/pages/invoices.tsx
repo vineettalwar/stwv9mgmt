@@ -150,14 +150,9 @@ function CreateInvoiceDialog({ onCreated }: { onCreated: () => void }) {
 
   const selectedCompany = (companies ?? []).find(c => String(c.id) === form.companyId);
 
-  const { mutate: markInvoiced } = useMarkExpensesInvoiced();
-
   const { mutate, isPending } = useCreateInvoice({
     mutation: {
-      onSuccess: (invoice) => {
-        if (selectedExpenseIds.length > 0 && selectedProjectId > 0) {
-          markInvoiced({ id: selectedProjectId, data: { expenseIds: selectedExpenseIds } });
-        }
+      onSuccess: () => {
         toast({ title: "Invoice created" });
         setOpen(false);
         setSelectedExpenseIds([]);
@@ -239,6 +234,7 @@ function CreateInvoiceDialog({ onCreated }: { onCreated: () => void }) {
         isRecurring: form.isRecurring,
         recurringInterval: form.isRecurring ? form.recurringInterval : null,
         lineItems: lineItems.filter(li => li.description.trim()),
+        expenseIds: selectedExpenseIds.length > 0 ? selectedExpenseIds : undefined,
       },
     });
   }

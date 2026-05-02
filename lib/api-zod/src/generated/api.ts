@@ -1710,6 +1710,10 @@ export const CreateInvoiceBody = zod.object({
       }),
     )
     .optional(),
+  expenseIds: zod
+    .array(zod.number())
+    .optional()
+    .describe("Expense IDs to mark as invoiced when the invoice is created"),
 });
 
 /**

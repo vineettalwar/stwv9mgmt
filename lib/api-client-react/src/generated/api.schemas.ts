@@ -910,6 +910,8 @@ export interface CreateInvoiceBody {
   /** @nullable */
   recurringInterval?: string | null;
   lineItems?: CreateInvoiceLineItemBody[];
+  /** Expense IDs to mark as invoiced when the invoice is created */
+  expenseIds?: number[];
 }
 
 export interface UpdateInvoiceBody {

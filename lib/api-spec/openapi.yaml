@@ -3902,6 +3902,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CreateInvoiceLineItemBody"
+        expenseIds:
+          type: array
+          items:
+            type: integer
+          description: Expense IDs to mark as invoiced when the invoice is created
       required:
         - companyId
         - title

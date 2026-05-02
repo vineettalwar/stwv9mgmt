@@ -14,6 +14,7 @@ import {
   projectsTable,
   timeEntriesTable,
   userCompanyAssignmentsTable,
+  expensesTable,
 } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
 import { logAudit, logAuditTx, snapshotActorName } from "../lib/auditLogger";
@@ -48,6 +49,7 @@ const CreateInvoiceBody = z.object({
   isRecurring: z.boolean().optional(),
   recurringInterval: z.string().nullable().optional(),
   lineItems: z.array(LineItemSchema).optional(),
+  expenseIds: z.array(z.number().int()).optional(),
 });
 
 function addInterval(dateStr: string, interval: string): string {
@@ -191,7 +193,7 @@ router.post("/invoices", requireAuth, loadDbUser, async (req, res): Promise<void
   const parsed = CreateInvoiceBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
-  const { lineItems = [], ...invoiceData } = parsed.data;
+  const { lineItems = [], expenseIds = [], ...invoiceData } = parsed.data;
 
   const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, invoiceData.companyId));
   if (!company) { res.status(400).json({ error: "Company not found" }); return; }
@@ -233,6 +235,12 @@ router.post("/invoices", requireAuth, loadDbUser, async (req, res): Promise<void
         sortOrder: li.sortOrder ?? idx,
       }))
     );
+  }
+
+  if (expenseIds.length > 0) {
+    await db.update(expensesTable)
+      .set({ invoicedAt: new Date() })
+      .where(inArray(expensesTable.id, expenseIds));
   }
 
   const full = await getInvoiceWithDetails(invoice.id);

@@ -254,14 +254,15 @@ function ProfitabilityReport() {
   const exportQs = `type=project-profitability${companyId ? `&companyId=${companyId}` : ""}&startDate=${startDate}&endDate=${endDate}`;
 
   const totals = useMemo(() => {
-    if (!data) return { invoiced: 0, cost: 0, margin: 0 };
+    if (!data) return { invoiced: 0, cost: 0, expenseCost: 0, margin: 0 };
     return data.rows.reduce(
       (acc, r) => ({
         invoiced: acc.invoiced + parseFloat(r.totalInvoiced),
         cost: acc.cost + parseFloat(r.totalCost),
+        expenseCost: acc.expenseCost + parseFloat((r as unknown as { totalExpenseCost?: string }).totalExpenseCost ?? "0"),
         margin: acc.margin + parseFloat(r.margin),
       }),
-      { invoiced: 0, cost: 0, margin: 0 },
+      { invoiced: 0, cost: 0, expenseCost: 0, margin: 0 },
     );
   }, [data]);
 
@@ -289,14 +290,18 @@ function ProfitabilityReport() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-600">Total Invoiced</CardTitle></CardHeader>
           <CardContent><div className="text-2xl font-bold text-slate-900" data-testid="profit-invoiced">{formatNumber(totals.invoiced)}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-600">Total Cost</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-600">Time Cost</CardTitle></CardHeader>
           <CardContent><div className="text-2xl font-bold text-slate-900" data-testid="profit-cost">{formatNumber(totals.cost)}</div></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-600">Expense Cost</CardTitle></CardHeader>
+          <CardContent><div className="text-2xl font-bold text-amber-700" data-testid="profit-expense-cost">{formatNumber(totals.expenseCost)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-600">Net Margin</CardTitle></CardHeader>
@@ -328,13 +333,15 @@ function ProfitabilityReport() {
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Invoiced</TableHead>
                   <TableHead className="text-right">Hours</TableHead>
-                  <TableHead className="text-right">Cost</TableHead>
+                  <TableHead className="text-right">Time Cost</TableHead>
+                  <TableHead className="text-right">Expenses</TableHead>
                   <TableHead className="text-right">Margin</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {data.rows.map((r) => {
                   const margin = parseFloat(r.margin);
+                  const expCost = parseFloat((r as unknown as { totalExpenseCost?: string }).totalExpenseCost ?? "0");
                   return (
                     <TableRow key={r.projectId} data-testid={`row-project-${r.projectId}`}>
                       <TableCell className="font-medium">{r.projectName}</TableCell>
@@ -343,6 +350,7 @@ function ProfitabilityReport() {
                       <TableCell className="text-right">{r.currency} {formatNumber(r.totalInvoiced)}</TableCell>
                       <TableCell className="text-right">{formatNumber(r.totalHours, 1)}</TableCell>
                       <TableCell className="text-right">{r.currency} {formatNumber(r.totalCost)}</TableCell>
+                      <TableCell className="text-right text-amber-700">{expCost > 0 ? `${r.currency} ${formatNumber(expCost)}` : "—"}</TableCell>
                       <TableCell className={`text-right font-semibold ${margin >= 0 ? "text-emerald-700" : "text-red-600"}`}>
                         {r.currency} {formatNumber(r.margin)}
                       </TableCell>

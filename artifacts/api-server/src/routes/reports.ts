@@ -96,6 +96,10 @@ async function fetchProjectProfitability(companyId: number | undefined, startDat
     ? sql`AND te.date::date BETWEEN ${startDate}::date AND ${endDate}::date`
     : sql``;
 
+  const expDateFilter = startDate && endDate
+    ? sql`AND ex.date::date BETWEEN ${startDate}::date AND ${endDate}::date`
+    : sql``;
+
   const result = await db.execute(sql`
     WITH invoiced AS (
       SELECT i.project_id, coalesce(sum(i.total_amount::numeric), 0) AS total_invoiced, max(i.currency) AS currency
@@ -114,6 +118,16 @@ async function fetchProjectProfitability(companyId: number | undefined, startDat
       WHERE 1 = 1
         ${teDateFilter}
       GROUP BY te.project_id
+    ),
+    expense_costs AS (
+      SELECT ex.project_id,
+             coalesce(sum(CASE WHEN ex.is_billable THEN ex.amount::numeric ELSE 0 END), 0) AS billable_expense_cost,
+             coalesce(sum(CASE WHEN NOT ex.is_billable THEN ex.amount::numeric ELSE 0 END), 0) AS internal_expense_cost,
+             coalesce(sum(ex.amount::numeric), 0) AS total_expense_cost
+      FROM expenses ex
+      WHERE 1 = 1
+        ${expDateFilter}
+      GROUP BY ex.project_id
     )
     SELECT
       p.id AS project_id,
@@ -125,20 +139,26 @@ async function fetchProjectProfitability(companyId: number | undefined, startDat
       coalesce(inv.total_invoiced, 0)::text AS total_invoiced,
       coalesce(co.total_hours, 0)::text AS total_hours,
       coalesce(co.total_cost, 0)::text AS total_cost,
-      (coalesce(inv.total_invoiced, 0) - coalesce(co.total_cost, 0))::text AS margin
+      coalesce(ex.total_expense_cost, 0)::text AS total_expense_cost,
+      coalesce(ex.billable_expense_cost, 0)::text AS billable_expense_cost,
+      coalesce(ex.internal_expense_cost, 0)::text AS internal_expense_cost,
+      (coalesce(inv.total_invoiced, 0) - coalesce(co.total_cost, 0) - coalesce(ex.total_expense_cost, 0))::text AS margin
     FROM projects p
     LEFT JOIN companies c ON c.id = p.company_id
     LEFT JOIN invoiced inv ON inv.project_id = p.id
     LEFT JOIN costs co ON co.project_id = p.id
+    LEFT JOIN expense_costs ex ON ex.project_id = p.id
     WHERE 1 = 1
       ${companyFilter}
-    ORDER BY (coalesce(inv.total_invoiced, 0) - coalesce(co.total_cost, 0)) DESC
+    ORDER BY (coalesce(inv.total_invoiced, 0) - coalesce(co.total_cost, 0) - coalesce(ex.total_expense_cost, 0)) DESC
   `);
 
   return (result.rows as Array<{
     project_id: number; project_name: string; status: string;
     company_id: number | null; company_name: string | null; currency: string;
-    total_invoiced: string; total_hours: string; total_cost: string; margin: string;
+    total_invoiced: string; total_hours: string; total_cost: string;
+    total_expense_cost: string; billable_expense_cost: string; internal_expense_cost: string;
+    margin: string;
   }>).map(r => ({
     projectId: r.project_id,
     projectName: r.project_name,
@@ -149,6 +169,9 @@ async function fetchProjectProfitability(companyId: number | undefined, startDat
     totalInvoiced: r.total_invoiced,
     totalHours: r.total_hours,
     totalCost: r.total_cost,
+    totalExpenseCost: r.total_expense_cost,
+    billableExpenseCost: r.billable_expense_cost,
+    internalExpenseCost: r.internal_expense_cost,
     margin: r.margin,
   }));
 }

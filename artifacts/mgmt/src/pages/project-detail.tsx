@@ -27,6 +27,7 @@ import {
   getListMilestonesQueryKey,
   getListProjectTimeEntriesQueryKey,
   getGetProjectBillingSummaryQueryKey,
+  getListProjectExpensesQueryKey,
 } from "@workspace/api-client-react";
 import type { Project, Expense } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -704,7 +705,7 @@ function ExpensesTab({ projectId, canEdit }: { projectId: number; canEdit: boole
   const { mutate: create, isPending: creating } = useCreateProjectExpense({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["listProjectExpenses", projectId] });
+        queryClient.invalidateQueries({ queryKey: getListProjectExpensesQueryKey(projectId) });
         toast({ title: "Expense logged" });
         form.reset({ currency: "EUR", category: "other", isBillable: false, date: new Date().toISOString().slice(0, 10), amount: "", description: "" });
         setOpen(false);
@@ -716,7 +717,7 @@ function ExpensesTab({ projectId, canEdit }: { projectId: number; canEdit: boole
   const { mutate: deleteExpense } = useDeleteProjectExpense({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["listProjectExpenses", projectId] });
+        queryClient.invalidateQueries({ queryKey: getListProjectExpensesQueryKey(projectId) });
         toast({ title: "Expense deleted" });
       },
       onError: () => toast({ title: "Cannot delete this expense", variant: "destructive" }),
@@ -725,7 +726,7 @@ function ExpensesTab({ projectId, canEdit }: { projectId: number; canEdit: boole
 
   const { mutate: toggleBillable } = useUpdateProjectExpense({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["listProjectExpenses", projectId] }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListProjectExpensesQueryKey(projectId) }),
       onError: () => toast({ title: "Update failed", variant: "destructive" }),
     },
   });
@@ -759,15 +760,14 @@ function ExpensesTab({ projectId, canEdit }: { projectId: number; canEdit: boole
             <span className="text-amber-600 font-medium">{unbilledCount} unbilled</span>
           )}
         </div>
-        {canEdit && (
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" data-testid="button-add-expense">
-                <Plus className="h-4 w-4 mr-2" /> Log Expense
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader><DialogTitle>Log Expense</DialogTitle></DialogHeader>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" data-testid="button-add-expense">
+              <Plus className="h-4 w-4 mr-2" /> Log Expense
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>Log Expense</DialogTitle></DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(v => create({ id: projectId, data: v }))} className="space-y-3 mt-2">
                   <div className="grid grid-cols-2 gap-3">
@@ -844,7 +844,6 @@ function ExpensesTab({ projectId, canEdit }: { projectId: number; canEdit: boole
               </Form>
             </DialogContent>
           </Dialog>
-        )}
       </div>
 
       {list.length === 0 ? (
