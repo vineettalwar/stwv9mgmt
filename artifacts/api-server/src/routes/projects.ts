@@ -10,7 +10,7 @@ import {
   timeEntriesTable,
 } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
-import { logAudit, logAuditTx } from "../lib/auditLogger";
+import { logAudit, logAuditTx, snapshotActorName } from "../lib/auditLogger";
 
 const router: IRouter = Router();
 
@@ -129,6 +129,8 @@ router.post("/projects", requireAuth, loadDbUser, async (req, res): Promise<void
     await logAuditTx(tx, {
       actorId: user.id,
       actorRole: user.role,
+      actorEmail: user.email,
+      actorName: snapshotActorName(user),
       action: "created",
       entityType: "project",
       entityId: inserted.id,
@@ -192,6 +194,8 @@ router.patch("/projects/:id", requireAuth, loadDbUser, async (req, res): Promise
       await logAuditTx(tx, {
         actorId: user.id,
         actorRole: user.role,
+        actorEmail: user.email,
+        actorName: snapshotActorName(user),
         action: "status_changed",
         entityType: "project",
         entityId: id,
@@ -227,6 +231,8 @@ router.delete("/projects/:id", requireAuth, loadDbUser, async (req, res): Promis
     await logAuditTx(tx, {
       actorId: user.id,
       actorRole: user.role,
+      actorEmail: user.email,
+      actorName: snapshotActorName(user),
       action: "archived",
       entityType: "project",
       entityId: id,

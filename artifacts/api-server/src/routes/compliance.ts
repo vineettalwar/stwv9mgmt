@@ -3,7 +3,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { db, complianceChecklistsTable, usersTable } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
-import { logAudit, logAuditTx } from "../lib/auditLogger";
+import { logAudit, logAuditTx, snapshotActorName } from "../lib/auditLogger";
 
 const router: IRouter = Router();
 
@@ -176,6 +176,8 @@ router.patch("/compliance/:id", requireAuth, loadDbUser, async (req, res): Promi
       await logAuditTx(tx, {
         actorId: user.id,
         actorRole: user.role,
+        actorEmail: user.email,
+        actorName: snapshotActorName(user),
         action: parsed.data.status === "filed" ? "filed" : "status_changed",
         entityType: "compliance",
         entityId: id,

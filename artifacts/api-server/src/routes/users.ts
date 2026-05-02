@@ -17,7 +17,7 @@ import {
   GetUserCompaniesResponse,
 } from "@workspace/api-zod";
 import { requireAuth, requireAdmin } from "../middlewares/requireRole";
-import { logAudit, logAuditTx } from "../lib/auditLogger";
+import { logAudit, logAuditTx, snapshotActorName } from "../lib/auditLogger";
 import { getAuth, clerkClient } from "@clerk/express";
 
 const router: IRouter = Router();
@@ -194,6 +194,8 @@ router.patch("/users/:id", requireAuth, requireAdmin, async (req, res): Promise<
       await logAuditTx(tx, {
         actorId: adminUser?.id ?? null,
         actorRole: adminUser?.role ?? "admin",
+        actorEmail: adminUser?.email ?? null,
+        actorName: snapshotActorName(adminUser),
         action: "role_changed",
         entityType: "user",
         entityId: updated.id,

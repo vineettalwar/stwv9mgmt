@@ -81,6 +81,8 @@ interface AuditLogEntry {
   createdAt: string;
   actorId: number | null;
   actorRole: string;
+  actorEmail: string | null;
+  actorName: string | null;
   action: string;
   entityType: string;
   entityId: number;
@@ -113,9 +115,15 @@ const ENTITY_TYPE_COLORS: Record<string, string> = {
 };
 
 function actorDisplayName(entry: AuditLogEntry): string {
-  if (!entry.actor) return entry.actorRole.replace(/_/g, " ");
-  const name = [entry.actor.firstName, entry.actor.lastName].filter(Boolean).join(" ");
-  return name || entry.actor.email;
+  // Prefer the snapshot fields so historical entries remain accurate even if
+  // the user's name/email later changes or the user is deleted.
+  if (entry.actorName) return entry.actorName;
+  if (entry.actorEmail) return entry.actorEmail;
+  if (entry.actor) {
+    const name = [entry.actor.firstName, entry.actor.lastName].filter(Boolean).join(" ");
+    return name || entry.actor.email;
+  }
+  return entry.actorRole.replace(/_/g, " ");
 }
 
 const TYPE_LABELS: Record<string, string> = {

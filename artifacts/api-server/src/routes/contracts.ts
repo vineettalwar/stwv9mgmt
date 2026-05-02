@@ -11,7 +11,7 @@ import {
   projectsTable,
 } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
-import { logAudit, logAuditTx } from "../lib/auditLogger";
+import { logAudit, logAuditTx, snapshotActorName } from "../lib/auditLogger";
 import { safeLogoFetch } from "../lib/safeLogoFetch";
 import { pdfToBuffer } from "../lib/pdfBuffer";
 import { sendDocumentEmail } from "../lib/emailService";
@@ -138,6 +138,8 @@ router.patch("/contracts/:id", requireAuth, loadDbUser, async (req, res): Promis
       await logAuditTx(tx, {
         actorId: user.id,
         actorRole: user.role,
+        actorEmail: user.email,
+        actorName: snapshotActorName(user),
         action: parsed.data.status === "signed" ? "signed" : "status_changed",
         entityType: "contract",
         entityId: id,
@@ -316,6 +318,8 @@ router.post("/contracts/:id/send", requireAuth, loadDbUser, async (req, res): Pr
         await logAuditTx(tx, {
           actorId: user.id,
           actorRole: user.role,
+          actorEmail: user.email,
+          actorName: snapshotActorName(user),
           action: "sent",
           entityType: "contract",
           entityId: id,

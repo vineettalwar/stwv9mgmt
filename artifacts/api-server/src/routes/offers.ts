@@ -12,7 +12,7 @@ import {
   contractsTable,
 } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
-import { logAudit, logAuditTx } from "../lib/auditLogger";
+import { logAudit, logAuditTx, snapshotActorName } from "../lib/auditLogger";
 import { safeLogoFetch } from "../lib/safeLogoFetch";
 import { pdfToBuffer } from "../lib/pdfBuffer";
 import { sendDocumentEmail } from "../lib/emailService";
@@ -211,6 +211,8 @@ router.patch("/offers/:id", requireAuth, loadDbUser, async (req, res): Promise<v
       await logAuditTx(tx, {
         actorId: user.id,
         actorRole: user.role,
+        actorEmail: user.email,
+        actorName: snapshotActorName(user),
         action,
         entityType: "offer",
         entityId: id,
@@ -452,6 +454,8 @@ router.post("/offers/:id/send", requireAuth, loadDbUser, async (req, res): Promi
         await logAuditTx(tx, {
           actorId: user.id,
           actorRole: user.role,
+          actorEmail: user.email,
+          actorName: snapshotActorName(user),
           action: "sent",
           entityType: "offer",
           entityId: id,
@@ -506,6 +510,8 @@ router.post("/offers/:id/convert-to-contract", requireAuth, loadDbUser, async (r
     await logAuditTx(tx, {
       actorId: user.id,
       actorRole: user.role,
+      actorEmail: user.email,
+      actorName: snapshotActorName(user),
       action: "accepted",
       entityType: "offer",
       entityId: id,

@@ -29,6 +29,8 @@ interface AuditLogEntry {
   createdAt: string;
   actorId: number | null;
   actorRole: string;
+  actorEmail: string | null;
+  actorName: string | null;
   action: string;
   entityType: string;
   entityId: number;
@@ -39,10 +41,16 @@ interface AuditLogEntry {
   actor: AuditLogActor | null;
 }
 
-function actorName(actor: AuditLogActor | null, role: string): string {
-  if (!actor) return `System (${role})`;
-  const name = [actor.firstName, actor.lastName].filter(Boolean).join(" ");
-  return name || actor.email;
+// Display name uses the snapshot first (immutable historical truth), then
+// falls back to the live joined user record only if no snapshot exists.
+function actorName(entry: AuditLogEntry): string {
+  if (entry.actorName) return entry.actorName;
+  if (entry.actorEmail) return entry.actorEmail;
+  if (entry.actor) {
+    const name = [entry.actor.firstName, entry.actor.lastName].filter(Boolean).join(" ");
+    return name || entry.actor.email;
+  }
+  return `System (${entry.actorRole})`;
 }
 
 const ACTION_LABELS: Record<string, string> = {
@@ -122,7 +130,7 @@ function AuditLogRow({ entry }: { entry: AuditLogEntry }) {
         <div className="flex-1 min-w-0 grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 items-center">
           <div className="min-w-0">
             <span className="text-sm font-medium text-slate-900">
-              {actorName(entry.actor, entry.actorRole)}
+              {actorName(entry)}
             </span>
             <span className="text-xs text-slate-400 ml-2">({entry.actorRole.replace(/_/g, " ")})</span>
             {entry.entityLabel && (

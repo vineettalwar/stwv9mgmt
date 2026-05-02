@@ -16,7 +16,7 @@ import {
   userCompanyAssignmentsTable,
 } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
-import { logAudit, logAuditTx } from "../lib/auditLogger";
+import { logAudit, logAuditTx, snapshotActorName } from "../lib/auditLogger";
 
 const router: IRouter = Router();
 
@@ -443,6 +443,8 @@ router.post("/invoices/:id/send", requireAuth, loadDbUser, async (req, res): Pro
         await logAuditTx(tx, {
           actorId: user.id,
           actorRole: user.role,
+          actorEmail: user.email,
+          actorName: snapshotActorName(user),
           action: "sent",
           entityType: "invoice",
           entityId: id,
@@ -518,6 +520,8 @@ router.patch("/invoices/:id", requireAuth, loadDbUser, async (req, res): Promise
       await logAuditTx(tx, {
         actorId: user.id,
         actorRole: user.role,
+        actorEmail: user.email,
+        actorName: snapshotActorName(user),
         action,
         entityType: "invoice",
         entityId: id,

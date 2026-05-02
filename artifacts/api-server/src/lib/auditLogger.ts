@@ -3,6 +3,10 @@ import { db, auditLogsTable } from "@workspace/db";
 export interface LogAuditParams {
   actorId: number | null;
   actorRole: string;
+  /** Snapshotted at write time; do NOT use a join when displaying historical entries. */
+  actorEmail?: string | null;
+  /** Snapshotted at write time; do NOT use a join when displaying historical entries. */
+  actorName?: string | null;
   action: string;
   entityType: string;
   entityId: number;
@@ -19,6 +23,8 @@ function buildAuditValues(params: LogAuditParams) {
   return {
     actorId: params.actorId,
     actorRole: params.actorRole,
+    actorEmail: params.actorEmail ?? null,
+    actorName: params.actorName ?? null,
     action: params.action,
     entityType: params.entityType,
     entityId: params.entityId,
@@ -27,6 +33,15 @@ function buildAuditValues(params: LogAuditParams) {
     newValue: params.newValue ?? null,
     projectId: params.projectId ?? null,
   };
+}
+
+/** Build a display name from a user-shaped object — used to snapshot at audit-write time. */
+export function snapshotActorName(
+  user: { firstName?: string | null; lastName?: string | null; email?: string | null } | null | undefined,
+): string | null {
+  if (!user) return null;
+  const name = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+  return name || user.email || null;
 }
 
 /**

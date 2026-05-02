@@ -51,12 +51,17 @@ router.get("/audit-logs", requireAuth, loadDbUser, async (req, res): Promise<voi
   const limitVal = q.limit;
   const offsetVal = q.offset;
 
+  // We expose snapshotted actorEmail/actorName for historical accuracy and ALSO
+  // join the live users row so the UI can link to the current user record when
+  // it still exists. The snapshot is the source of truth for display.
   const baseQuery = db
     .select({
       id: auditLogsTable.id,
       createdAt: auditLogsTable.createdAt,
       actorId: auditLogsTable.actorId,
       actorRole: auditLogsTable.actorRole,
+      actorEmail: auditLogsTable.actorEmail,
+      actorName: auditLogsTable.actorName,
       action: auditLogsTable.action,
       entityType: auditLogsTable.entityType,
       entityId: auditLogsTable.entityId,
@@ -119,6 +124,8 @@ router.get("/projects/:id/activity", requireAuth, loadDbUser, async (req, res): 
       createdAt: auditLogsTable.createdAt,
       actorId: auditLogsTable.actorId,
       actorRole: auditLogsTable.actorRole,
+      actorEmail: auditLogsTable.actorEmail,
+      actorName: auditLogsTable.actorName,
       action: auditLogsTable.action,
       entityType: auditLogsTable.entityType,
       entityId: auditLogsTable.entityId,
