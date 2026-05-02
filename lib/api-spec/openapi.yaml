@@ -3,13 +3,20 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: STWV Multi-Company Management Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: companies
+    description: Company entity management
+  - name: users
+    description: User management and role assignment
+  - name: dashboard
+    description: Dashboard summaries and stats
+
 paths:
   /healthz:
     get:
@@ -24,7 +31,319 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ───── COMPANIES ─────
+  /companies:
+    get:
+      operationId: listCompanies
+      tags: [companies]
+      summary: List all companies
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: List of companies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Company"
+    post:
+      operationId: createCompany
+      tags: [companies]
+      summary: Create a company
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCompanyBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+
+  /companies/{id}:
+    get:
+      operationId: getCompany
+      tags: [companies]
+      summary: Get a company
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Company
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateCompany
+      tags: [companies]
+      summary: Update a company
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCompanyBody"
+      responses:
+        "200":
+          description: Updated company
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteCompany
+      tags: [companies]
+      summary: Delete a company
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ───── USERS ─────
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create or sync a user
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/me:
+    get:
+      operationId: getMe
+      tags: [users]
+      summary: Get current authenticated user profile
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get a user
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update a user
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete a user
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /users/{id}/companies:
+    get:
+      operationId: getUserCompanies
+      tags: [users]
+      summary: Get company assignments for a user
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of user-company assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserCompanyAssignment"
+    post:
+      operationId: assignUserToCompany
+      tags: [users]
+      summary: Assign a user to a company
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignUserToCompanyBody"
+      responses:
+        "201":
+          description: Assignment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserCompanyAssignment"
+
+  /users/{id}/companies/{companyId}:
+    delete:
+      operationId: removeUserFromCompany
+      tags: [users]
+      summary: Remove a user from a company
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: companyId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+
+  # ───── DASHBOARD ─────
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Get platform-level summary stats
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +353,250 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    # ─── Company ───
+    Company:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        legalForm:
+          type: string
+        country:
+          type: string
+        taxRegime:
+          type: string
+          description: "One of: vat, gst, none"
+        taxNumber:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        bankDetails:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        currency:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - legalForm
+        - country
+        - taxRegime
+        - currency
+        - isActive
+        - createdAt
+        - updatedAt
+
+    CreateCompanyBody:
+      type: object
+      properties:
+        name:
+          type: string
+        legalForm:
+          type: string
+        country:
+          type: string
+        taxRegime:
+          type: string
+        taxNumber:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        bankDetails:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        currency:
+          type: string
+      required:
+        - name
+        - legalForm
+        - country
+        - taxRegime
+        - currency
+
+    UpdateCompanyBody:
+      type: object
+      properties:
+        name:
+          type: string
+        legalForm:
+          type: string
+        country:
+          type: string
+        taxRegime:
+          type: string
+        taxNumber:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        bankDetails:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        currency:
+          type: string
+        isActive:
+          type: boolean
+
+    # ─── User ───
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        clerkUserId:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        role:
+          type: string
+          description: "One of: admin, germany_accountant, india_accountant, project_manager, client, freelancer"
+        isActive:
+          type: boolean
+        companies:
+          type: array
+          items:
+            $ref: "#/components/schemas/Company"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - clerkUserId
+        - email
+        - role
+        - isActive
+        - companies
+        - createdAt
+        - updatedAt
+
+    CreateUserBody:
+      type: object
+      properties:
+        clerkUserId:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        role:
+          type: string
+      required:
+        - clerkUserId
+        - email
+        - role
+
+    UpdateUserBody:
+      type: object
+      properties:
+        email:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        role:
+          type: string
+        isActive:
+          type: boolean
+
+    UserCompanyAssignment:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        companyId:
+          type: integer
+        company:
+          $ref: "#/components/schemas/Company"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - companyId
+        - company
+        - createdAt
+
+    AssignUserToCompanyBody:
+      type: object
+      properties:
+        companyId:
+          type: integer
+      required:
+        - companyId
+
+    # ─── Dashboard ───
+    DashboardStats:
+      type: object
+      properties:
+        totalCompanies:
+          type: integer
+        totalUsers:
+          type: integer
+        usersByRole:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoleCount"
+        companiesByCountry:
+          type: array
+          items:
+            $ref: "#/components/schemas/CountryCount"
+      required:
+        - totalCompanies
+        - totalUsers
+        - usersByRole
+        - companiesByCountry
+
+    RoleCount:
+      type: object
+      properties:
+        role:
+          type: string
+        count:
+          type: integer
+      required:
+        - role
+        - count
+
+    CountryCount:
+      type: object
+      properties:
+        country:
+          type: string
+        count:
+          type: integer
+      required:
+        - country
+        - count
