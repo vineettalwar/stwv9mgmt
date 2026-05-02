@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db, expensesTable, projectsTable, usersTable, projectAssignmentsTable } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
@@ -7,6 +7,7 @@ import { requireAuth, loadDbUser } from "../middlewares/requireRole";
 const router: IRouter = Router();
 
 const ADMIN_PM = ["admin", "project_manager"];
+const BILLING_ROLES = ["admin", "project_manager", "germany_accountant", "india_accountant"];
 const STAFF_ROLES = ["admin", "project_manager", "employee", "freelancer", "germany_accountant", "india_accountant"];
 const EXPENSE_CATEGORIES = ["travel", "software", "hardware", "other"] as const;
 
@@ -20,7 +21,7 @@ const ExpenseBody = z.object({
 });
 
 async function canAccessProject(userId: number, userRole: string, projectId: number): Promise<boolean> {
-  if (ADMIN_PM.includes(userRole)) return true;
+  if (BILLING_ROLES.includes(userRole)) return true;
   const [assignment] = await db
     .select({ id: projectAssignmentsTable.id })
     .from(projectAssignmentsTable)
@@ -113,9 +114,14 @@ router.patch("/projects/:id/expenses/:expenseId", requireAuth, loadDbUser, async
   );
   if (!existing) { res.status(404).json({ error: "Expense not found" }); return; }
 
-  const canSetBillable = ADMIN_PM.includes(user.role);
+  const isAdminPm = ADMIN_PM.includes(user.role);
+  if (!isAdminPm && existing.createdBy !== user.id) {
+    res.status(403).json({ error: "Only the expense creator or an admin/project manager can update this expense" });
+    return;
+  }
+
   const updates: Partial<typeof expensesTable.$inferInsert> = { ...parsed.data, updatedAt: new Date() };
-  if (!canSetBillable) delete updates.isBillable;
+  if (!isAdminPm) delete updates.isBillable;
 
   const [updated] = await db.update(expensesTable).set(updates).where(eq(expensesTable.id, expenseId)).returning();
   res.json(updated);
@@ -136,6 +142,11 @@ router.delete("/projects/:id/expenses/:expenseId", requireAuth, loadDbUser, asyn
   );
   if (!existing) { res.status(404).json({ error: "Expense not found" }); return; }
   if (existing.invoicedAt) { res.status(409).json({ error: "Cannot delete an expense that has already been invoiced" }); return; }
+
+  if (!ADMIN_PM.includes(user.role) && existing.createdBy !== user.id) {
+    res.status(403).json({ error: "Only the expense creator or an admin/project manager can delete this expense" });
+    return;
+  }
 
   await db.delete(expensesTable).where(eq(expensesTable.id, expenseId));
   res.status(204).send();
@@ -173,16 +184,31 @@ router.post("/projects/:id/expenses/mark-invoiced", requireAuth, loadDbUser, asy
   const parsed = Body.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
-  const now = new Date();
-  await Promise.all(
-    parsed.data.expenseIds.map(expenseId =>
-      db.update(expensesTable)
-        .set({ invoicedAt: now, updatedAt: now })
-        .where(and(eq(expensesTable.id, expenseId), eq(expensesTable.projectId, projectId)))
-    )
-  );
+  const { expenseIds } = parsed.data;
 
-  res.json({ success: true, count: parsed.data.expenseIds.length });
+  const validExpenses = await db.select({ id: expensesTable.id })
+    .from(expensesTable)
+    .where(and(
+      inArray(expensesTable.id, expenseIds),
+      eq(expensesTable.projectId, projectId),
+      eq(expensesTable.isBillable, true),
+      isNull(expensesTable.invoicedAt),
+    ));
+  const validIds = validExpenses.map(e => e.id);
+  const invalidIds = expenseIds.filter(id => !validIds.includes(id));
+  if (invalidIds.length > 0) {
+    res.status(400).json({ error: `Invalid expenseIds: ${invalidIds.join(", ")} — must belong to project, be billable, and not yet invoiced` });
+    return;
+  }
+
+  if (validIds.length > 0) {
+    const now = new Date();
+    await db.update(expensesTable)
+      .set({ invoicedAt: now, updatedAt: now })
+      .where(inArray(expensesTable.id, validIds));
+  }
+
+  res.json({ success: true, count: validIds.length });
 });
 
 export default router;
