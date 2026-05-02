@@ -415,6 +415,10 @@ router.post("/invoices/:id/send", requireAuth, loadDbUser, async (req, res): Pro
   if (!invoice.client?.email) {
     res.status(400).json({ error: "Invoice has no client with an email address" }); return;
   }
+  const SENDABLE_INVOICE_STATUSES = ["draft", "sent"];
+  if (!SENDABLE_INVOICE_STATUSES.includes(invoice.status)) {
+    res.status(400).json({ error: `Cannot send an invoice with status "${invoice.status}"` }); return;
+  }
   try {
     const pdfBuffer = await pdfToBuffer(doc => buildInvoicePdf(doc, invoice));
     const recipientName = [invoice.client.firstName, invoice.client.lastName].filter(Boolean).join(" ") || invoice.client.email;

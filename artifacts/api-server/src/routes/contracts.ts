@@ -271,6 +271,10 @@ router.post("/contracts/:id/send", requireAuth, loadDbUser, async (req, res): Pr
   if (!contract.client?.email) {
     res.status(400).json({ error: "Contract has no client with an email address" }); return;
   }
+  const SENDABLE_CONTRACT_STATUSES = ["draft", "sent"];
+  if (!SENDABLE_CONTRACT_STATUSES.includes(contract.status)) {
+    res.status(400).json({ error: `Cannot send a contract with status "${contract.status}"` }); return;
+  }
   try {
     const pdfBuffer = await pdfToBuffer(doc => buildContractPdf(doc, contract));
     const recipientName = [contract.client.firstName, contract.client.lastName].filter(Boolean).join(" ") || contract.client.email;

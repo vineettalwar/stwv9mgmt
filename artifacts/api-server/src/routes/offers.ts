@@ -403,6 +403,10 @@ router.post("/offers/:id/send", requireAuth, loadDbUser, async (req, res): Promi
   if (!offer.client?.email) {
     res.status(400).json({ error: "Offer has no client with an email address" }); return;
   }
+  const SENDABLE_OFFER_STATUSES = ["draft", "sent"];
+  if (!SENDABLE_OFFER_STATUSES.includes(offer.status)) {
+    res.status(400).json({ error: `Cannot send an offer with status "${offer.status}"` }); return;
+  }
   try {
     const pdfBuffer = await pdfToBuffer(doc => buildOfferPdf(doc, offer));
     const recipientName = [offer.client.firstName, offer.client.lastName].filter(Boolean).join(" ") || offer.client.email;

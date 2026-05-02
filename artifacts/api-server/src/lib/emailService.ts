@@ -32,7 +32,7 @@ function buildEmailHtml(opts: {
   const TYPE_LABELS = { offer: "Offer", contract: "Contract", invoice: "Invoice" };
   const label = TYPE_LABELS[opts.type];
   const BLUE = "#1e3a5f";
-  const greeting = opts.recipientName ? `Dear ${opts.recipientName},` : "Dear Client,";
+  const greeting = opts.recipientName ? `Dear ${escHtml(opts.recipientName)},` : "Dear Client,";
   const actionLine = {
     offer: "Please find your offer attached. Review it at your convenience and reach out if you have any questions.",
     contract: "Please find your contract attached. Review the terms and contact us if you need any clarifications.",
@@ -41,7 +41,7 @@ function buildEmailHtml(opts: {
 
   const detailRows: string[] = [];
   if (opts.docNumber) {
-    detailRows.push(`<tr><td style="color:#64748b;padding:4px 0;width:130px">${label} Number</td><td style="font-weight:600;padding:4px 0">${opts.docNumber}</td></tr>`);
+    detailRows.push(`<tr><td style="color:#64748b;padding:4px 0;width:130px">${label} Number</td><td style="font-weight:600;padding:4px 0">${escHtml(opts.docNumber)}</td></tr>`);
   }
   if (opts.title) {
     detailRows.push(`<tr><td style="color:#64748b;padding:4px 0">Subject</td><td style="font-weight:600;padding:4px 0">${escHtml(opts.title)}</td></tr>`);
@@ -71,11 +71,11 @@ function buildEmailHtml(opts: {
         <!-- Header -->
         <tr><td style="background:${BLUE};padding:28px 40px">
           <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.3px">${escHtml(opts.fromCompanyName)}</h1>
-          <p style="margin:6px 0 0;color:#94a3b8;font-size:13px">${label} · ${opts.docNumber}</p>
+          <p style="margin:6px 0 0;color:#94a3b8;font-size:13px">${label} · ${escHtml(opts.docNumber)}</p>
         </td></tr>
         <!-- Body -->
         <tr><td style="padding:36px 40px">
-          <p style="margin:0 0 16px;color:#1e293b;font-size:15px">${greeting}</p>
+          <p style="margin:0 0 16px;color:#1e293b;font-size:15px;white-space:pre-line">${greeting}</p>
           <p style="margin:0 0 28px;color:#475569;font-size:14px;line-height:1.6">${actionLine}</p>
           <!-- Details table -->
           <table cellpadding="0" cellspacing="0" style="width:100%;border-top:2px solid ${BLUE};border-bottom:1px solid #e2e8f0;margin-bottom:28px">
