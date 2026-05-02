@@ -69,19 +69,19 @@ const createUserSchema = z.object({
 
 type CreateUserValues = z.infer<typeof createUserSchema>;
 
-function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
+function InviteUserDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const { mutate: adminCreateUser, isPending } = useAdminCreateUser({
     mutation: {
       onSuccess: (_data, variables) => {
-        toast({ title: "User pre-registered", description: `${variables.data.email} will be assigned ${variables.data.role ?? "freelancer"} role on first sign-in.` });
+        toast({ title: "User invited", description: `${variables.data.email} will be assigned the ${variables.data.role ?? "freelancer"} role when they first sign in.` });
         form.reset();
         setOpen(false);
         onCreated();
       },
       onError: (err: unknown) => {
-        const message = (err as { message?: string })?.message ?? "Failed to create user";
+        const message = (err as { message?: string })?.message ?? "Failed to invite user";
         toast({ title: "Error", description: message, variant: "destructive" });
       },
     },
@@ -106,16 +106,16 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" data-testid="button-create-user">
-          <UserPlus className="h-4 w-4 mr-2" /> Create User
+        <Button size="sm" data-testid="button-invite-user">
+          <UserPlus className="h-4 w-4 mr-2" /> Invite User
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Pre-register a User</DialogTitle>
+          <DialogTitle>Invite a User</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-slate-500">
-          Enter the user's email and role. They will be assigned this role automatically when they sign in.
+          Enter the user's email and select their role. They will be assigned this role automatically when they first sign in.
         </p>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-2">
@@ -126,7 +126,7 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
                 <FormItem>
                   <FormLabel>Email *</FormLabel>
                   <FormControl>
-                    <Input data-testid="input-create-user-email" placeholder="user@example.com" {...field} />
+                    <Input data-testid="input-invite-user-email" placeholder="user@example.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -140,7 +140,7 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
                   <FormItem>
                     <FormLabel>First Name</FormLabel>
                     <FormControl>
-                      <Input data-testid="input-create-user-firstname" {...field} />
+                      <Input data-testid="input-invite-user-firstname" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -153,7 +153,7 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
                   <FormItem>
                     <FormLabel>Last Name</FormLabel>
                     <FormControl>
-                      <Input data-testid="input-create-user-lastname" {...field} />
+                      <Input data-testid="input-invite-user-lastname" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -168,7 +168,7 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
                   <FormLabel>Role *</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <SelectTrigger data-testid="select-create-user-role">
+                      <SelectTrigger data-testid="select-invite-user-role">
                         <SelectValue />
                       </SelectTrigger>
                     </FormControl>
@@ -189,8 +189,8 @@ function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isPending} data-testid="button-submit-create-user">
-                {isPending ? "Creating..." : "Create User"}
+              <Button type="submit" disabled={isPending} data-testid="button-submit-invite-user">
+                {isPending ? "Inviting..." : "Invite User"}
               </Button>
             </div>
           </form>
@@ -223,7 +223,7 @@ export default function Users() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Users</h1>
           <p className="text-sm text-slate-500">All platform users and their roles.</p>
         </div>
-        <CreateUserDialog onCreated={() => queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() })} />
+        <InviteUserDialog onCreated={() => queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() })} />
       </div>
 
       <div className="max-w-sm">
@@ -252,7 +252,7 @@ export default function Users() {
             {search ? "No users match your search" : "No users yet"}
           </h3>
           <p className="mt-1 text-sm text-slate-500">
-            {search ? "Try a different search term." : "Use the Create User button above to pre-register users, or they will appear here once they sign in."}
+            {search ? "Try a different search term." : "Use the Invite User button above to pre-register users, or they will appear here once they sign in."}
           </p>
         </div>
       ) : (

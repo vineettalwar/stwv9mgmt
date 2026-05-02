@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ClerkProvider, RedirectToSignIn, useAuth, AuthenticateWithRedirectCallback } from "@clerk/react";
 import { setAuthTokenGetter, useGetMe } from "@workspace/api-client-react";
-
 import { Layout } from "@/components/layout/Layout";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";

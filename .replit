@@ -40,5 +40,8 @@ externalPort = 3000
 [userenv.shared]
 VITE_CLERK_PUBLISHABLE_KEY = "pk_test_Y2FyZWZ1bC1taW5rLTI5LmNsZXJrLmFjY291bnRzLmRldiQ"
 
+[userenv.development]
+VITE_DEV_USER_EMAIL = "develop"
+
 [nix]
 channel = "stable-25_05"
