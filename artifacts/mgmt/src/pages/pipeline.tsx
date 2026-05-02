@@ -115,7 +115,7 @@ function OfferCard({
   onDownload: (type: "offer", id: number, number: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const canConvert = (offer.status === "accepted" || offer.status === "sent") && linkedContracts.length === 0;
+  const canConvert = (offer.status === "draft" || offer.status === "sent") && linkedContracts.length === 0;
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
