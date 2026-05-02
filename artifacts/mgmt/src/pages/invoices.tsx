@@ -47,7 +47,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Receipt, Trash2, Download, CheckCircle, Send, RefreshCw } from "lucide-react";
+import { Plus, Receipt, Trash2, Download, CheckCircle, Send, RefreshCw, ExternalLink } from "lucide-react";
+import { useLocation } from "wouter";
 import { generateInvoicePdf } from "@/lib/pdf-generator";
 
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
@@ -386,6 +387,7 @@ type InvoiceType = Invoice;
 function InvoiceCard({ invoice }: { invoice: InvoiceType }) {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [, setLocation] = useLocation();
 
   const { mutate: updateInvoice } = useUpdateInvoice({
     mutation: {
@@ -419,7 +421,12 @@ function InvoiceCard({ invoice }: { invoice: InvoiceType }) {
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1 flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-slate-900">{invoice.title}</span>
+              <button
+                className="font-medium text-slate-900 hover:text-slate-600 hover:underline text-left"
+                onClick={() => setLocation(`/invoices/${invoice.id}`)}
+              >
+                {invoice.title}
+              </button>
               <Badge variant="secondary" className={`text-xs ${status.className}`}>{status.label}</Badge>
               <span className="text-xs text-slate-400 font-mono">{invoice.invoiceNumber}</span>
               {invoice.isRecurring && (

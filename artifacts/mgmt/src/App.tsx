@@ -25,6 +25,7 @@ import Todos from "@/pages/todos";
 import Offers from "@/pages/offers";
 import Contracts from "@/pages/contracts";
 import Invoices from "@/pages/invoices";
+import InvoiceDetail from "@/pages/invoice-detail";
 import DocumentCentre from "@/pages/document-centre";
 
 const queryClient = new QueryClient({
@@ -155,6 +156,7 @@ function Router() {
       <Route path="/offers" component={() => <PrivateRoute component={Offers} allowedRoles={STAFF_ROLES} />} />
       <Route path="/contracts" component={() => <PrivateRoute component={Contracts} allowedRoles={STAFF_ROLES} />} />
       <Route path="/invoices" component={() => <PrivateRoute component={Invoices} allowedRoles={STAFF_ROLES} />} />
+      <Route path="/invoices/:id" component={() => <PrivateRoute component={InvoiceDetail} allowedRoles={STAFF_ROLES} />} />
       <Route path="/client-portal" component={() => <PrivateRoute component={ClientPortal} allowedRoles={CLIENT_ONLY} />} />
       <Route path="/freelancer-portal" component={() => <PrivateRoute component={FreelancerPortal} allowedRoles={FREELANCER_ONLY} />} />
       <Route path="/settings" component={() => <PrivateRoute component={Settings} allowedRoles={ALL_ROLES} />} />

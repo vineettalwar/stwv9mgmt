@@ -3,6 +3,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import {
   db,
+  pool,
   invoicesTable,
   invoiceLineItemsTable,
   companiesTable,
@@ -70,6 +71,22 @@ function determineTaxType(taxRegime: string, sellerState?: string | null, buyerS
     return "cgst_sgst"; // default to intra-state when states unknown
   }
   return "none";
+}
+
+async function generateInvoiceNumber(companyId: number, taxRegime: string, year: number): Promise<string> {
+  const result = await pool.query<{ next_seq: number }>(
+    `INSERT INTO invoice_sequences (company_id, year, next_seq)
+     VALUES ($1, $2, 1)
+     ON CONFLICT (company_id, year)
+     DO UPDATE SET next_seq = invoice_sequences.next_seq + 1
+     RETURNING next_seq`,
+    [companyId, year],
+  );
+  const seq = result.rows[0].next_seq;
+  const seqStr = String(seq).padStart(3, "0");
+  if (taxRegime === "vat") return `DE-${year}-${seqStr}`;
+  if (taxRegime === "gst") return `IN-GST-${year}-${seqStr}`;
+  return `IN-${year}-${seqStr}`;
 }
 
 async function computeTotals(
@@ -157,7 +174,7 @@ router.post("/invoices", requireAuth, loadDbUser, async (req, res): Promise<void
   const taxRate = determineTaxRate(taxType);
   const totals = await computeTotals(lineItems, taxRate);
 
-  const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+  const invoiceNumber = await generateInvoiceNumber(company.id, company.taxRegime, new Date().getFullYear());
 
   const initialNextInvoiceDate =
     invoiceData.isRecurring && invoiceData.recurringInterval && invoiceData.issueDate
