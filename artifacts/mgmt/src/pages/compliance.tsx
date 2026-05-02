@@ -5,9 +5,11 @@ import {
   useUpdateComplianceItem,
   useSeedCompliance,
   useListCompanies,
-  useListUsers,
+  useGetTaxSummary,
   getListComplianceQueryKey,
+  GetTaxSummaryRegime,
   type ComplianceItem,
+  type TaxSummaryReport,
 } from "@workspace/api-client-react";
 import { useGetMe } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +31,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { CheckCircle2, Clock, AlertCircle, Plus, RefreshCw, Shield } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, Plus, RefreshCw, Shield, FileBarChart, Download, FileText } from "lucide-react";
+import { generateTaxSummaryPdf } from "@/lib/pdf-generator";
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.ElementType; className: string }> = {
   pending: { label: "Pending", icon: Clock, className: "bg-amber-100 text-amber-800" },
@@ -45,7 +48,281 @@ function isOverdue(deadline: string, status: string) {
   return status !== "filed" && new Date(deadline) < new Date();
 }
 
-function ComplianceRow({ item, onUpdate }: { item: ComplianceItem; onUpdate: () => void }) {
+/** Derive the filing period start/end from compliance item fields */
+function getPeriod(item: ComplianceItem): { periodStart: string; periodEnd: string } | null {
+  const { year, quarter, month } = item;
+  if (!year) return null;
+
+  if (month != null) {
+    const m = String(month).padStart(2, "0");
+    const lastDay = new Date(year, month, 0).getDate();
+    return { periodStart: `${year}-${m}-01`, periodEnd: `${year}-${m}-${lastDay}` };
+  }
+
+  if (quarter != null) {
+    const quarterMap: Record<number, [string, string]> = {
+      1: [`${year}-01-01`, `${year}-03-31`],
+      2: [`${year}-04-01`, `${year}-06-30`],
+      3: [`${year}-07-01`, `${year}-09-30`],
+      4: [`${year}-10-01`, `${year}-12-31`],
+    };
+    const range = quarterMap[quarter];
+    if (!range) return null;
+    return { periodStart: range[0], periodEnd: range[1] };
+  }
+
+  // Annual — full year
+  return { periodStart: `${year}-01-01`, periodEnd: `${year}-12-31` };
+}
+
+/** Check if this compliance item is tax-filing related (has a reportable period) */
+function isTaxFiling(item: ComplianceItem): boolean {
+  const key = item.itemKey.toLowerCase();
+  return key.includes("vat") || key.includes("gstr") || key.includes("gst");
+}
+
+function csvCell(v: string | number | null | undefined): string {
+  const s = String(v ?? "");
+  if (s.includes(",") || s.includes('"') || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function downloadTaxSummaryCsv(report: TaxSummaryReport) {
+  const isGermany = report.regime === "germany";
+  const header = isGermany
+    ? "Rate Band,Invoices,Net Amount (Excl. Tax),Tax Collected,Gross Amount"
+    : "GST Component,Invoices,Taxable Value,CGST,SGST,IGST,Tax Total,Gross Total";
+
+  const rows = report.breakdown.map(b => {
+    if (isGermany) {
+      return [csvCell(b.label), csvCell(b.invoiceCount), csvCell(b.netAmount), csvCell(b.taxAmount), csvCell(b.grossAmount)].join(",");
+    }
+    return [
+      csvCell(b.label), csvCell(b.invoiceCount), csvCell(b.netAmount),
+      csvCell(b.cgst ?? ""), csvCell(b.sgst ?? ""), csvCell(b.igst ?? ""),
+      csvCell(b.taxAmount), csvCell(b.grossAmount),
+    ].join(",");
+  });
+
+  const summary = isGermany
+    ? `\n\nTotals,${report.invoiceCount},${report.totalNet},${report.totalTax},${report.totalGross}`
+    : `\n\nTotals,${report.invoiceCount},${report.totalNet},,,,${report.totalTax},${report.totalGross}`;
+
+  const csv = [header, ...rows].join("\n") + summary;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `tax-summary-${report.companyName.replace(/\s+/g, "-").toLowerCase()}-${report.periodStart}-to-${report.periodEnd}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function TaxReportModal({ item }: { item: ComplianceItem }) {
+  const [open, setOpen] = useState(false);
+  const period = getPeriod(item);
+
+  const { data: report, isLoading, isError } = useGetTaxSummary(
+    {
+      companyId: item.companyId,
+      regime: item.regime as GetTaxSummaryRegime,
+      periodStart: period?.periodStart ?? "",
+      periodEnd: period?.periodEnd ?? "",
+    },
+    {
+      query: {
+        enabled: open && !!period,
+        queryKey: ["taxSummary", item.companyId, item.regime, period?.periodStart, period?.periodEnd],
+      },
+    },
+  );
+
+  if (!period) return null;
+
+  const isGermany = item.regime === "germany";
+  const cur = report?.currency ?? (isGermany ? "EUR" : "INR");
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="shrink-0 h-7 text-xs gap-1" data-testid={`btn-generate-report-${item.id}`}>
+          <FileBarChart className="h-3 w-3" />
+          Report
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileBarChart className="h-5 w-5 text-slate-500" />
+            {isGermany ? "VAT Summary" : "GST Summary"} — {item.itemLabel}
+          </DialogTitle>
+        </DialogHeader>
+
+        {!period && (
+          <p className="text-sm text-slate-500">Cannot determine period for this item.</p>
+        )}
+
+        {isLoading && (
+          <div className="space-y-3 py-4">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        )}
+
+        {isError && !isLoading && (
+          <div className="py-6 text-center">
+            <AlertCircle className="h-8 w-8 mx-auto text-red-400 mb-2" />
+            <p className="text-sm text-red-600 font-medium">Failed to load tax summary</p>
+            <p className="text-xs text-slate-400 mt-1">Check that the company and period are correct.</p>
+          </div>
+        )}
+
+        {report && !isLoading && (
+          <div className="space-y-5 pt-1">
+            {/* Summary cards */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Invoices</div>
+                <div className="text-xl font-bold text-slate-900">{report.invoiceCount}</div>
+                <div className="text-xs text-slate-400">{report.periodStart} → {report.periodEnd}</div>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Net Revenue</div>
+                <div className="text-xl font-bold text-slate-900">{cur} {parseFloat(report.totalNet).toFixed(2)}</div>
+                <div className="text-xs text-slate-400">Excl. tax</div>
+              </div>
+              <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+                <div className="text-xs text-blue-600 font-medium uppercase tracking-wide mb-1">Tax Collected</div>
+                <div className="text-xl font-bold text-blue-800">{cur} {parseFloat(report.totalTax).toFixed(2)}</div>
+                <div className="text-xs text-blue-400">Output {isGermany ? "VAT" : "GST"}</div>
+              </div>
+            </div>
+
+            {/* Breakdown table */}
+            <div>
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                {isGermany ? "VAT Breakdown by Rate Band" : "GST Breakdown by Component"}
+              </h3>
+              {report.breakdown.length === 0 ? (
+                <div className="rounded-lg border border-slate-200 p-8 text-center text-sm text-slate-400">
+                  No invoices found in this period for this company.
+                </div>
+              ) : (
+                <div className="rounded-lg border border-slate-200 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                      {isGermany ? (
+                        <tr>
+                          <th className="text-left px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Rate Band</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Invoices</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Net (Excl. Tax)</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Tax (MwSt)</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Gross Total</th>
+                        </tr>
+                      ) : (
+                        <tr>
+                          <th className="text-left px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">GST Component</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Inv.</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Taxable</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">CGST</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">SGST</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">IGST</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Tax Total</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Gross</th>
+                        </tr>
+                      )}
+                    </thead>
+                    <tbody>
+                      {report.breakdown.map((b, idx) => (
+                        <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                          {isGermany ? (
+                            <>
+                              <td className="px-3 py-2.5 font-medium text-slate-800">{b.label}</td>
+                              <td className="px-3 py-2.5 text-right text-slate-600">{b.invoiceCount}</td>
+                              <td className="px-3 py-2.5 text-right text-slate-600">{cur} {parseFloat(b.netAmount).toFixed(2)}</td>
+                              <td className="px-3 py-2.5 text-right font-medium text-blue-700">{cur} {parseFloat(b.taxAmount).toFixed(2)}</td>
+                              <td className="px-3 py-2.5 text-right text-slate-800 font-semibold">{cur} {parseFloat(b.grossAmount).toFixed(2)}</td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-3 py-2.5 font-medium text-slate-800">{b.label}</td>
+                              <td className="px-3 py-2.5 text-right text-slate-600">{b.invoiceCount}</td>
+                              <td className="px-3 py-2.5 text-right text-slate-600">{cur} {parseFloat(b.netAmount).toFixed(2)}</td>
+                              <td className="px-3 py-2.5 text-right text-slate-600">{b.cgst ? `${cur} ${parseFloat(b.cgst).toFixed(2)}` : "—"}</td>
+                              <td className="px-3 py-2.5 text-right text-slate-600">{b.sgst ? `${cur} ${parseFloat(b.sgst).toFixed(2)}` : "—"}</td>
+                              <td className="px-3 py-2.5 text-right text-slate-600">{b.igst ? `${cur} ${parseFloat(b.igst).toFixed(2)}` : "—"}</td>
+                              <td className="px-3 py-2.5 text-right font-medium text-blue-700">{cur} {parseFloat(b.taxAmount).toFixed(2)}</td>
+                              <td className="px-3 py-2.5 text-right text-slate-800 font-semibold">{cur} {parseFloat(b.grossAmount).toFixed(2)}</td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-slate-50 border-t-2 border-slate-300">
+                      {isGermany ? (
+                        <tr>
+                          <td className="px-3 py-2.5 font-bold text-slate-900">Total</td>
+                          <td className="px-3 py-2.5 text-right font-bold text-slate-900">{report.invoiceCount}</td>
+                          <td className="px-3 py-2.5 text-right font-bold text-slate-900">{cur} {parseFloat(report.totalNet).toFixed(2)}</td>
+                          <td className="px-3 py-2.5 text-right font-bold text-blue-800">{cur} {parseFloat(report.totalTax).toFixed(2)}</td>
+                          <td className="px-3 py-2.5 text-right font-bold text-slate-900">{cur} {parseFloat(report.totalGross).toFixed(2)}</td>
+                        </tr>
+                      ) : (
+                        <tr>
+                          <td className="px-3 py-2.5 font-bold text-slate-900">Total</td>
+                          <td className="px-3 py-2.5 text-right font-bold text-slate-900">{report.invoiceCount}</td>
+                          <td className="px-3 py-2.5 text-right font-bold text-slate-900">{cur} {parseFloat(report.totalNet).toFixed(2)}</td>
+                          <td className="px-3 py-2.5 text-right font-bold text-slate-900">—</td>
+                          <td className="px-3 py-2.5 text-right font-bold text-slate-900">—</td>
+                          <td className="px-3 py-2.5 text-right font-bold text-slate-900">—</td>
+                          <td className="px-3 py-2.5 text-right font-bold text-blue-800">{cur} {parseFloat(report.totalTax).toFixed(2)}</td>
+                          <td className="px-3 py-2.5 text-right font-bold text-slate-900">{cur} {parseFloat(report.totalGross).toFixed(2)}</td>
+                        </tr>
+                      )}
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Note */}
+            <p className="text-xs text-slate-400 italic">
+              {isGermany
+                ? "Output VAT on sales invoices only. Input tax credits (Vorsteuer) are not included. Excludes draft and cancelled invoices."
+                : "Output GST on sales invoices only. Input Tax Credit (ITC) is not included. Excludes draft and cancelled invoices."}
+            </p>
+
+            {/* Download buttons */}
+            <div className="flex gap-2 justify-end pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => downloadTaxSummaryCsv(report)}
+                className="gap-1.5"
+                data-testid={`btn-download-csv-${item.id}`}
+              >
+                <Download className="h-4 w-4" />
+                Download CSV
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => generateTaxSummaryPdf(report as Parameters<typeof generateTaxSummaryPdf>[0])}
+                className="gap-1.5"
+                data-testid={`btn-download-pdf-${item.id}`}
+              >
+                <FileText className="h-4 w-4" />
+                Download PDF
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ComplianceRow({ item, onUpdate, isAccountant }: { item: ComplianceItem; onUpdate: () => void; isAccountant: boolean }) {
   const { toast } = useToast();
   const { mutate: updateItem, isPending } = useUpdateComplianceItem({
     mutation: {
@@ -57,6 +334,7 @@ function ComplianceRow({ item, onUpdate }: { item: ComplianceItem; onUpdate: () 
   const statusConfig = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.pending!;
   const StatusIcon = statusConfig.icon;
   const effectiveOverdue = isOverdue(item.deadline, item.status);
+  const showReport = isAccountant && isTaxFiling(item);
 
   function toggleFiled() {
     if (item.status === "filed") {
@@ -89,6 +367,7 @@ function ComplianceRow({ item, onUpdate }: { item: ComplianceItem; onUpdate: () 
         <StatusIcon className="h-3 w-3 mr-1" />
         {effectiveOverdue && item.status !== "filed" ? "Overdue" : statusConfig.label}
       </Badge>
+      {showReport && <TaxReportModal item={item} />}
       <Button
         size="sm"
         variant={item.status === "filed" ? "outline" : "default"}
@@ -325,7 +604,7 @@ export default function Compliance() {
               </CardHeader>
               <CardContent className="pt-2 pb-0">
                 {germanyItems.map(item => (
-                  <ComplianceRow key={item.id} item={item} onUpdate={refetch} />
+                  <ComplianceRow key={item.id} item={item} onUpdate={refetch} isAccountant={isAccountant} />
                 ))}
               </CardContent>
             </Card>
@@ -340,7 +619,7 @@ export default function Compliance() {
               </CardHeader>
               <CardContent className="pt-2 pb-0">
                 {indiaItems.map(item => (
-                  <ComplianceRow key={item.id} item={item} onUpdate={refetch} />
+                  <ComplianceRow key={item.id} item={item} onUpdate={refetch} isAccountant={isAccountant} />
                 ))}
               </CardContent>
             </Card>

@@ -1,11 +1,12 @@
 import { Router, type IRouter } from "express";
-import { sql } from "drizzle-orm";
-import { db } from "@workspace/db";
+import { sql, eq, and, gte, lte, notInArray } from "drizzle-orm";
+import { db, invoicesTable, companiesTable } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
 
 const router: IRouter = Router();
 
 const REPORT_ROLES = ["admin", "project_manager"];
+const TAX_REPORT_ROLES = ["admin", "germany_accountant", "india_accountant"];
 
 function requireReporter(req: import("express").Request, res: import("express").Response): boolean {
   const user = req.dbUser;
@@ -39,6 +40,165 @@ function toCsv(rows: Array<Record<string, unknown>>, columns: string[]): string 
   const body = rows.map(r => columns.map(c => csvCell(r[c] as string | number | null | undefined)).join(","));
   return [header, ...body].join("\n");
 }
+
+// ── TAX SUMMARY ──
+// Returns VAT (Germany) or GST (India) breakdown for a company/period.
+router.get("/reports/tax-summary", requireAuth, loadDbUser, async (req, res): Promise<void> => {
+  const user = req.dbUser!;
+  if (!TAX_REPORT_ROLES.includes(user.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const companyId = parseIntOrUndef(req.query.companyId);
+  const regime = String(req.query.regime ?? "");
+  const periodStart = isValidDate(req.query.periodStart) ? req.query.periodStart : undefined;
+  const periodEnd = isValidDate(req.query.periodEnd) ? req.query.periodEnd : undefined;
+
+  if (!companyId || !regime || !periodStart || !periodEnd) {
+    res.status(400).json({ error: "companyId, regime, periodStart, and periodEnd (YYYY-MM-DD) are required" });
+    return;
+  }
+  if (!["germany", "india"].includes(regime)) {
+    res.status(400).json({ error: "regime must be 'germany' or 'india'" });
+    return;
+  }
+
+  // Fetch company info
+  const [company] = await db.select({ id: companiesTable.id, name: companiesTable.name, currency: companiesTable.currency })
+    .from(companiesTable).where(eq(companiesTable.id, companyId));
+  if (!company) { res.status(404).json({ error: "Company not found" }); return; }
+
+  // Role scoping: germany_accountant can only access germany regime; india_accountant only india
+  if (user.role === "germany_accountant" && regime !== "germany") { res.status(403).json({ error: "Forbidden" }); return; }
+  if (user.role === "india_accountant" && regime !== "india") { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const EXCLUDED_STATUSES = ["draft", "cancelled"] as const;
+
+  if (regime === "germany") {
+    // Group by tax_rate to handle 19% / 7% / 0% bands
+    const result = await db.execute(sql`
+      SELECT
+        tax_type,
+        tax_rate::text AS tax_rate,
+        count(*)::int AS invoice_count,
+        coalesce(sum(total_amount::numeric), 0)::text AS gross_amount,
+        coalesce(sum(subtotal::numeric), 0)::text AS net_amount,
+        coalesce(sum(tax_amount::numeric), 0)::text AS tax_amount
+      FROM invoices
+      WHERE company_id = ${companyId}
+        AND issue_date::date BETWEEN ${periodStart}::date AND ${periodEnd}::date
+        AND status NOT IN ('draft', 'cancelled')
+      GROUP BY tax_type, tax_rate
+      ORDER BY tax_rate::numeric DESC
+    `);
+
+    type GermanyRow = { tax_type: string; tax_rate: string; invoice_count: number; gross_amount: string; net_amount: string; tax_amount: string };
+    const rows = result.rows as GermanyRow[];
+
+    const totals = rows.reduce((acc, r) => ({
+      invoiceCount: acc.invoiceCount + Number(r.invoice_count),
+      totalGross: acc.totalGross + parseFloat(r.gross_amount),
+      totalNet: acc.totalNet + parseFloat(r.net_amount),
+      totalTax: acc.totalTax + parseFloat(r.tax_amount),
+    }), { invoiceCount: 0, totalGross: 0, totalNet: 0, totalTax: 0 });
+
+    const breakdown = rows.map(r => {
+      const rate = parseFloat(r.tax_rate);
+      const label = rate === 0 ? "Tax Exempt (0%)" : `VAT ${rate.toFixed(0)}% (Umsatzsteuer)`;
+      return {
+        label,
+        taxType: r.tax_type,
+        taxRate: r.tax_rate,
+        invoiceCount: Number(r.invoice_count),
+        grossAmount: r.gross_amount,
+        netAmount: r.net_amount,
+        taxAmount: r.tax_amount,
+        cgst: null,
+        sgst: null,
+        igst: null,
+      };
+    });
+
+    res.json({
+      companyId,
+      companyName: company.name,
+      regime,
+      periodStart,
+      periodEnd,
+      currency: company.currency ?? "EUR",
+      invoiceCount: totals.invoiceCount,
+      totalGross: totals.totalGross.toFixed(2),
+      totalNet: totals.totalNet.toFixed(2),
+      totalTax: totals.totalTax.toFixed(2),
+      breakdown,
+    });
+    return;
+  }
+
+  // India GST: group by tax_type (cgst_sgst vs igst) and rate
+  const result = await db.execute(sql`
+    SELECT
+      tax_type,
+      tax_rate::text AS tax_rate,
+      count(*)::int AS invoice_count,
+      coalesce(sum(total_amount::numeric), 0)::text AS gross_amount,
+      coalesce(sum(subtotal::numeric), 0)::text AS net_amount,
+      coalesce(sum(tax_amount::numeric), 0)::text AS tax_amount
+    FROM invoices
+    WHERE company_id = ${companyId}
+      AND issue_date::date BETWEEN ${periodStart}::date AND ${periodEnd}::date
+      AND status NOT IN ('draft', 'cancelled')
+    GROUP BY tax_type, tax_rate
+    ORDER BY tax_type, tax_rate::numeric DESC
+  `);
+
+  type IndiaRow = { tax_type: string; tax_rate: string; invoice_count: number; gross_amount: string; net_amount: string; tax_amount: string };
+  const rows = result.rows as IndiaRow[];
+
+  const totals = rows.reduce((acc, r) => ({
+    invoiceCount: acc.invoiceCount + Number(r.invoice_count),
+    totalGross: acc.totalGross + parseFloat(r.gross_amount),
+    totalNet: acc.totalNet + parseFloat(r.net_amount),
+    totalTax: acc.totalTax + parseFloat(r.tax_amount),
+  }), { invoiceCount: 0, totalGross: 0, totalNet: 0, totalTax: 0 });
+
+  const breakdown = rows.map(r => {
+    const taxAmt = parseFloat(r.tax_amount);
+    const half = (taxAmt / 2).toFixed(2);
+    const isCgstSgst = r.tax_type === "cgst_sgst";
+    const isIgst = r.tax_type === "igst";
+    const rate = parseFloat(r.tax_rate);
+    const label = isCgstSgst
+      ? `CGST+SGST ${(rate / 2).toFixed(0)}%+${(rate / 2).toFixed(0)}% (Intra-state ${rate.toFixed(0)}%)`
+      : isIgst
+        ? `IGST ${rate.toFixed(0)}% (Inter-state)`
+        : `No GST (Exempt/Export)`;
+    return {
+      label,
+      taxType: r.tax_type,
+      taxRate: r.tax_rate,
+      invoiceCount: Number(r.invoice_count),
+      grossAmount: r.gross_amount,
+      netAmount: r.net_amount,
+      taxAmount: r.tax_amount,
+      cgst: isCgstSgst ? half : null,
+      sgst: isCgstSgst ? half : null,
+      igst: isIgst ? r.tax_amount : null,
+    };
+  });
+
+  res.json({
+    companyId,
+    companyName: company.name,
+    regime,
+    periodStart,
+    periodEnd,
+    currency: company.currency ?? "INR",
+    invoiceCount: totals.invoiceCount,
+    totalGross: totals.totalGross.toFixed(2),
+    totalNet: totals.totalNet.toFixed(2),
+    totalTax: totals.totalTax.toFixed(2),
+    breakdown,
+  });
+});
 
 // ── REVENUE TREND ──
 // Monthly invoiced totals over last N months (default 12), broken down by company.

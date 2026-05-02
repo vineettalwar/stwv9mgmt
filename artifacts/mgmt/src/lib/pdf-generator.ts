@@ -1,3 +1,30 @@
+export type TaxSummaryBandData = {
+  label: string;
+  taxType: string;
+  taxRate: string;
+  invoiceCount: number;
+  grossAmount: string;
+  netAmount: string;
+  taxAmount: string;
+  cgst?: string | null;
+  sgst?: string | null;
+  igst?: string | null;
+};
+
+export type TaxSummaryReportData = {
+  companyId: number;
+  companyName: string;
+  regime: "germany" | "india";
+  periodStart: string;
+  periodEnd: string;
+  currency: string;
+  invoiceCount: number;
+  totalGross: string;
+  totalNet: string;
+  totalTax: string;
+  breakdown: TaxSummaryBandData[];
+};
+
 type LineItem = {
   description: string;
   quantity: string | number;
@@ -127,6 +154,94 @@ function openPrintWindow(html: string, title: string) {
     </style>
   </head><body>${html}<br><br><button onclick="window.print()" style="background:#0f172a;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:13px">Print / Save as PDF</button></body></html>`);
   win.document.close();
+}
+
+export function generateTaxSummaryPdf(report: TaxSummaryReportData) {
+  const isGermany = report.regime === "germany";
+  const regimeLabel = isGermany ? "Germany — VAT Voranmeldung Summary" : "India — GSTR-3B Summary";
+  const cur = esc(report.currency);
+
+  const bandRows = report.breakdown.map(b => {
+    if (isGermany) {
+      return `
+        <tr>
+          <td>${esc(b.label)}</td>
+          <td style="text-align:right">${esc(b.invoiceCount)}</td>
+          <td style="text-align:right">${cur} ${fmt(b.netAmount)}</td>
+          <td style="text-align:right">${cur} ${fmt(b.taxAmount)}</td>
+          <td style="text-align:right">${cur} ${fmt(b.grossAmount)}</td>
+        </tr>`;
+    }
+    return `
+      <tr>
+        <td>${esc(b.label)}</td>
+        <td style="text-align:right">${esc(b.invoiceCount)}</td>
+        <td style="text-align:right">${cur} ${fmt(b.netAmount)}</td>
+        <td style="text-align:right">${b.cgst ? `${cur} ${fmt(b.cgst)}` : "—"}</td>
+        <td style="text-align:right">${b.sgst ? `${cur} ${fmt(b.sgst)}` : "—"}</td>
+        <td style="text-align:right">${b.igst ? `${cur} ${fmt(b.igst)}` : "—"}</td>
+        <td style="text-align:right">${cur} ${fmt(b.taxAmount)}</td>
+        <td style="text-align:right">${cur} ${fmt(b.grossAmount)}</td>
+      </tr>`;
+  }).join("");
+
+  const tableHead = isGermany
+    ? `<tr><th>Rate Band</th><th style="text-align:right">Invoices</th><th style="text-align:right">Net (Excl. Tax)</th><th style="text-align:right">Tax Collected</th><th style="text-align:right">Gross Total</th></tr>`
+    : `<tr><th>GST Component</th><th style="text-align:right">Invoices</th><th style="text-align:right">Taxable Value</th><th style="text-align:right">CGST</th><th style="text-align:right">SGST</th><th style="text-align:right">IGST</th><th style="text-align:right">Tax Total</th><th style="text-align:right">Gross Total</th></tr>`;
+
+  const html = `
+    <div class="header">
+      <div>
+        <h1>${esc(regimeLabel)}</h1>
+        <div class="doc-number">Period: ${esc(report.periodStart)} to ${esc(report.periodEnd)}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="color:#64748b;font-size:12px;margin-top:4px">Generated: ${new Date().toLocaleDateString()}</div>
+      </div>
+    </div>
+
+    <div class="section grid-2">
+      <div>
+        <h3>Company</h3>
+        <h2>${esc(report.companyName)}</h2>
+      </div>
+      <div>
+        <h3>Period</h3>
+        <div class="value">${esc(report.periodStart)} — ${esc(report.periodEnd)}</div>
+        <div class="value" style="margin-top:4px">Invoices in scope: <strong>${esc(report.invoiceCount)}</strong></div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="section">
+      <h3>${isGermany ? "VAT Breakdown by Rate Band" : "GST Breakdown by Component"}</h3>
+      <table>
+        <thead>${tableHead}</thead>
+        <tbody>${bandRows || `<tr><td colspan="${isGermany ? 5 : 8}" style="text-align:center;color:#94a3b8;padding:20px">No invoices in this period</td></tr>`}</tbody>
+      </table>
+    </div>
+
+    <div class="totals" style="margin-top:24px">
+      <div class="totals-row"><span>Total Taxable (Net)</span><span>${cur} ${fmt(report.totalNet)}</span></div>
+      <div class="totals-row"><span>Total Tax Collected</span><span>${cur} ${fmt(report.totalTax)}</span></div>
+      <div class="totals-total"><span>Total Gross Revenue</span><span>${cur} ${fmt(report.totalGross)}</span></div>
+    </div>
+
+    ${isGermany ? `
+    <br>
+    <div class="notes" style="font-size:11px;color:#64748b">
+      <strong>Note:</strong> This report summarises output tax on sales invoices only. Input tax credits (Vorsteuer) are not included.
+      VAT reference: Umsatzsteuervoranmeldung pursuant to §18 UStG.
+    </div>` : `
+    <br>
+    <div class="notes" style="font-size:11px;color:#64748b">
+      <strong>Note:</strong> This report covers output GST on sales invoices only. ITC (Input Tax Credit) is not included.
+      CGST+SGST applies to intra-state transactions; IGST applies to inter-state transactions.
+    </div>`}
+  `;
+
+  openPrintWindow(html, `${regimeLabel} — ${report.periodStart} to ${report.periodEnd}`);
 }
 
 export function generateOfferPdf(offer: OfferData) {

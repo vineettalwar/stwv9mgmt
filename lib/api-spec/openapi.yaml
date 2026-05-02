@@ -2090,6 +2090,45 @@ paths:
                 $ref: "#/components/schemas/AdminDashboardStats"
 
   # ───── REPORTS ─────
+  /reports/tax-summary:
+    get:
+      operationId: getTaxSummary
+      tags: [reports]
+      summary: Tax period summary (VAT for Germany, GST for India) derived from invoices
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: companyId
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: regime
+          required: true
+          schema: { type: string, enum: [germany, india] }
+        - in: query
+          name: periodStart
+          required: true
+          schema: { type: string }
+          description: Start date YYYY-MM-DD (inclusive)
+        - in: query
+          name: periodEnd
+          required: true
+          schema: { type: string }
+          description: End date YYYY-MM-DD (inclusive)
+      responses:
+        "200":
+          description: Tax summary with breakdown bands
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxSummaryReport"
+        "400":
+          description: Missing or invalid parameters
+        "403":
+          description: Forbidden
+        "404":
+          description: Company not found
+
   /reports/revenue-trend:
     get:
       operationId: getRevenueTrend
@@ -4097,6 +4136,76 @@ components:
           oneOf:
             - $ref: "#/components/schemas/AuditLogActor"
             - type: "null"
+
+    TaxSummaryBand:
+      type: object
+      required: [label, taxType, taxRate, invoiceCount, grossAmount, netAmount, taxAmount]
+      properties:
+        label:
+          type: string
+          description: Human-readable band label (e.g. "VAT 19% (Umsatzsteuer)", "IGST 18% (Inter-state)")
+        taxType:
+          type: string
+          description: Raw tax_type from invoice (vat, cgst_sgst, igst, none)
+        taxRate:
+          type: string
+          description: Tax rate percentage as stored (e.g. "19.00", "18.00", "0.00")
+        invoiceCount:
+          type: integer
+        grossAmount:
+          type: string
+          description: Total amount (net + tax)
+        netAmount:
+          type: string
+          description: Subtotal before tax
+        taxAmount:
+          type: string
+          description: Total tax collected in this band
+        cgst:
+          type: ["string", "null"]
+          description: CGST component (half of taxAmount, India intra-state only)
+        sgst:
+          type: ["string", "null"]
+          description: SGST component (half of taxAmount, India intra-state only)
+        igst:
+          type: ["string", "null"]
+          description: IGST component (India inter-state only)
+
+    TaxSummaryReport:
+      type: object
+      required: [companyId, companyName, regime, periodStart, periodEnd, currency, invoiceCount, totalGross, totalNet, totalTax, breakdown]
+      properties:
+        companyId:
+          type: integer
+        companyName:
+          type: string
+        regime:
+          type: string
+          enum: [germany, india]
+        periodStart:
+          type: string
+          description: YYYY-MM-DD
+        periodEnd:
+          type: string
+          description: YYYY-MM-DD
+        currency:
+          type: string
+        invoiceCount:
+          type: integer
+          description: Total non-draft/cancelled invoices in the period
+        totalGross:
+          type: string
+          description: Sum of all totalAmount values
+        totalNet:
+          type: string
+          description: Sum of all subtotal values
+        totalTax:
+          type: string
+          description: Sum of all taxAmount values
+        breakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaxSummaryBand"
 
     CalendarEvent:
       type: object

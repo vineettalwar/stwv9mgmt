@@ -1034,6 +1034,65 @@ export interface AuditLog {
   actor?: AuditLogActor | null;
 }
 
+export interface TaxSummaryBand {
+  /** Human-readable band label (e.g. "VAT 19% (Umsatzsteuer)", "IGST 18% (Inter-state)") */
+  label: string;
+  /** Raw tax_type from invoice (vat, cgst_sgst, igst, none) */
+  taxType: string;
+  /** Tax rate percentage as stored (e.g. "19.00", "18.00", "0.00") */
+  taxRate: string;
+  invoiceCount: number;
+  /** Total amount (net + tax) */
+  grossAmount: string;
+  /** Subtotal before tax */
+  netAmount: string;
+  /** Total tax collected in this band */
+  taxAmount: string;
+  /**
+   * CGST component (half of taxAmount, India intra-state only)
+   * @nullable
+   */
+  cgst?: string | null;
+  /**
+   * SGST component (half of taxAmount, India intra-state only)
+   * @nullable
+   */
+  sgst?: string | null;
+  /**
+   * IGST component (India inter-state only)
+   * @nullable
+   */
+  igst?: string | null;
+}
+
+export type TaxSummaryReportRegime =
+  (typeof TaxSummaryReportRegime)[keyof typeof TaxSummaryReportRegime];
+
+export const TaxSummaryReportRegime = {
+  germany: "germany",
+  india: "india",
+} as const;
+
+export interface TaxSummaryReport {
+  companyId: number;
+  companyName: string;
+  regime: TaxSummaryReportRegime;
+  /** YYYY-MM-DD */
+  periodStart: string;
+  /** YYYY-MM-DD */
+  periodEnd: string;
+  currency: string;
+  /** Total non-draft/cancelled invoices in the period */
+  invoiceCount: number;
+  /** Sum of all totalAmount values */
+  totalGross: string;
+  /** Sum of all subtotal values */
+  totalNet: string;
+  /** Sum of all taxAmount values */
+  totalTax: string;
+  breakdown: TaxSummaryBand[];
+}
+
 export type CalendarEventType =
   (typeof CalendarEventType)[keyof typeof CalendarEventType];
 
@@ -1128,6 +1187,27 @@ export type MarkExpensesInvoiced200 = {
   success?: boolean;
   count?: number;
 };
+
+export type GetTaxSummaryParams = {
+  companyId: number;
+  regime: GetTaxSummaryRegime;
+  /**
+   * Start date YYYY-MM-DD (inclusive)
+   */
+  periodStart: string;
+  /**
+   * End date YYYY-MM-DD (inclusive)
+   */
+  periodEnd: string;
+};
+
+export type GetTaxSummaryRegime =
+  (typeof GetTaxSummaryRegime)[keyof typeof GetTaxSummaryRegime];
+
+export const GetTaxSummaryRegime = {
+  germany: "germany",
+  india: "india",
+} as const;
 
 export type GetRevenueTrendParams = {
   /**

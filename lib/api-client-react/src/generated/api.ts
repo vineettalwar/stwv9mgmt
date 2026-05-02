@@ -51,6 +51,7 @@ import type {
   GetProjectBillingSummaryParams,
   GetProjectProfitabilityParams,
   GetRevenueTrendParams,
+  GetTaxSummaryParams,
   GetTimeSummaryParams,
   HealthStatus,
   Invoice,
@@ -75,6 +76,7 @@ import type {
   SeedComplianceBody,
   SendDocumentResponse,
   SendMessageBody,
+  TaxSummaryReport,
   TimeEntry,
   TimeEntryWithProject,
   TimeSummaryReport,
@@ -7898,6 +7900,100 @@ export function useGetAdminDashboardStats<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetAdminDashboardStatsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Tax period summary (VAT for Germany, GST for India) derived from invoices
+ */
+export const getGetTaxSummaryUrl = (params: GetTaxSummaryParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/reports/tax-summary?${stringifiedParams}`
+    : `/api/reports/tax-summary`;
+};
+
+export const getTaxSummary = async (
+  params: GetTaxSummaryParams,
+  options?: RequestInit,
+): Promise<TaxSummaryReport> => {
+  return customFetch<TaxSummaryReport>(getGetTaxSummaryUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetTaxSummaryQueryKey = (params?: GetTaxSummaryParams) => {
+  return [`/api/reports/tax-summary`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetTaxSummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTaxSummary>>,
+  TError = ErrorType<void>,
+>(
+  params: GetTaxSummaryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTaxSummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetTaxSummaryQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getTaxSummary>>> = ({
+    signal,
+  }) => getTaxSummary(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTaxSummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetTaxSummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTaxSummary>>
+>;
+export type GetTaxSummaryQueryError = ErrorType<void>;
+
+/**
+ * @summary Tax period summary (VAT for Germany, GST for India) derived from invoices
+ */
+
+export function useGetTaxSummary<
+  TData = Awaited<ReturnType<typeof getTaxSummary>>,
+  TError = ErrorType<void>,
+>(
+  params: GetTaxSummaryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTaxSummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetTaxSummaryQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

@@ -2387,6 +2387,66 @@ export const GetAdminDashboardStatsResponse = zod.object({
 });
 
 /**
+ * @summary Tax period summary (VAT for Germany, GST for India) derived from invoices
+ */
+export const GetTaxSummaryQueryParams = zod.object({
+  companyId: zod.coerce.number(),
+  regime: zod.enum(["germany", "india"]),
+  periodStart: zod.coerce
+    .string()
+    .describe("Start date YYYY-MM-DD (inclusive)"),
+  periodEnd: zod.coerce.string().describe("End date YYYY-MM-DD (inclusive)"),
+});
+
+export const GetTaxSummaryResponse = zod.object({
+  companyId: zod.number(),
+  companyName: zod.string(),
+  regime: zod.enum(["germany", "india"]),
+  periodStart: zod.string().describe("YYYY-MM-DD"),
+  periodEnd: zod.string().describe("YYYY-MM-DD"),
+  currency: zod.string(),
+  invoiceCount: zod
+    .number()
+    .describe("Total non-draft\/cancelled invoices in the period"),
+  totalGross: zod.string().describe("Sum of all totalAmount values"),
+  totalNet: zod.string().describe("Sum of all subtotal values"),
+  totalTax: zod.string().describe("Sum of all taxAmount values"),
+  breakdown: zod.array(
+    zod.object({
+      label: zod
+        .string()
+        .describe(
+          'Human-readable band label (e.g. \"VAT 19% (Umsatzsteuer)\", \"IGST 18% (Inter-state)\")',
+        ),
+      taxType: zod
+        .string()
+        .describe("Raw tax_type from invoice (vat, cgst_sgst, igst, none)"),
+      taxRate: zod
+        .string()
+        .describe(
+          'Tax rate percentage as stored (e.g. \"19.00\", \"18.00\", \"0.00\")',
+        ),
+      invoiceCount: zod.number(),
+      grossAmount: zod.string().describe("Total amount (net + tax)"),
+      netAmount: zod.string().describe("Subtotal before tax"),
+      taxAmount: zod.string().describe("Total tax collected in this band"),
+      cgst: zod
+        .string()
+        .nullish()
+        .describe("CGST component (half of taxAmount, India intra-state only)"),
+      sgst: zod
+        .string()
+        .nullish()
+        .describe("SGST component (half of taxAmount, India intra-state only)"),
+      igst: zod
+        .string()
+        .nullish()
+        .describe("IGST component (India inter-state only)"),
+    }),
+  ),
+});
+
+/**
  * @summary Monthly invoiced revenue over the last N months, broken down by company
  */
 export const getRevenueTrendQueryMonthsMax = 36;
