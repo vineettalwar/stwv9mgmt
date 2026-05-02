@@ -12,3 +12,6 @@ export * from "./offers";
 export * from "./contracts";
 export * from "./invoices";
 export * from "./invoiceSequences";
+export * from "./messages";
+export * from "./notifications";
+export * from "./compliance";

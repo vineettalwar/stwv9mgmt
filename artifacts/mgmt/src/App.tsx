@@ -28,6 +28,8 @@ import Invoices from "@/pages/invoices";
 import InvoiceDetail from "@/pages/invoice-detail";
 import InvoiceNew from "@/pages/invoice-new";
 import DocumentCentre from "@/pages/document-centre";
+import CommunicationHub from "@/pages/communication-hub";
+import Compliance from "@/pages/compliance";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -161,6 +163,9 @@ function Router() {
       <Route path="/invoices" component={() => <PrivateRoute component={Invoices} allowedRoles={STAFF_ROLES} />} />
       <Route path="/client-portal" component={() => <PrivateRoute component={ClientPortal} allowedRoles={CLIENT_ONLY} />} />
       <Route path="/freelancer-portal" component={() => <PrivateRoute component={FreelancerPortal} allowedRoles={FREELANCER_ONLY} />} />
+      <Route path="/communication-hub" component={() => <PrivateRoute component={CommunicationHub} allowedRoles={ALL_ROLES} />} />
+      <Route path="/communication-hub/:id" component={() => <PrivateRoute component={CommunicationHub} allowedRoles={ALL_ROLES} />} />
+      <Route path="/compliance" component={() => <PrivateRoute component={Compliance} allowedRoles={["admin", "germany_accountant", "india_accountant"] as UserRole[]} />} />
       <Route path="/settings" component={() => <PrivateRoute component={Settings} allowedRoles={ALL_ROLES} />} />
       <Route component={NotFound} />
     </Switch>

@@ -1864,3 +1864,229 @@ export const GetInvoicePdfParams = zod.object({
 export const ExportTallyQueryParams = zod.object({
   format: zod.coerce.string().optional(),
 });
+
+/**
+ * @summary Get or create the message thread for a project
+ */
+export const GetProjectThreadParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetProjectThreadResponse = zod.object({
+  thread: zod.object({
+    id: zod.number(),
+    projectId: zod.number(),
+    subject: zod.string().nullish(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+  messages: zod.array(
+    zod.object({
+      id: zod.number(),
+      threadId: zod.number(),
+      senderId: zod.number(),
+      body: zod.string(),
+      attachmentUrl: zod.string().nullish(),
+      attachmentName: zod.string().nullish(),
+      attachmentType: zod.string().nullish(),
+      isRead: zod.boolean(),
+      senderEmail: zod.string(),
+      senderFirstName: zod.string().nullish(),
+      senderLastName: zod.string().nullish(),
+      senderRole: zod.string(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Send a message in the project thread
+ */
+export const SendProjectMessageParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SendProjectMessageBody = zod.object({
+  body: zod.string(),
+  attachmentUrl: zod.string().nullish(),
+  attachmentName: zod.string().nullish(),
+  attachmentType: zod.string().nullish(),
+});
+
+/**
+ * @summary Mark a message as read
+ */
+export const MarkMessageReadParams = zod.object({
+  id: zod.coerce.number(),
+  messageId: zod.coerce.number(),
+});
+
+/**
+ * @summary List notifications for current user
+ */
+export const ListNotificationsResponseItem = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  type: zod
+    .string()
+    .describe(
+      "One of: new_message, deliverable_update, invoice_issued, offer_sent, contract_ready",
+    ),
+  title: zod.string(),
+  body: zod.string(),
+  entityType: zod.string().nullish(),
+  entityId: zod.number().nullish(),
+  isRead: zod.boolean(),
+  createdAt: zod.coerce.date(),
+});
+export const ListNotificationsResponse = zod.array(
+  ListNotificationsResponseItem,
+);
+
+/**
+ * @summary Mark a notification as read
+ */
+export const MarkNotificationReadParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Delete a notification
+ */
+export const DeleteNotificationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List compliance checklist items
+ */
+export const ListComplianceQueryParams = zod.object({
+  companyId: zod.coerce.number().optional(),
+  regime: zod.coerce.string().optional(),
+  year: zod.coerce.number().optional(),
+});
+
+export const ListComplianceResponseItem = zod.object({
+  id: zod.number(),
+  companyId: zod.number(),
+  regime: zod.string().describe("One of: germany, india"),
+  year: zod.number(),
+  quarter: zod.number().nullish(),
+  month: zod.number().nullish(),
+  itemKey: zod.string(),
+  itemLabel: zod.string(),
+  deadline: zod.string(),
+  status: zod.string().describe("One of: pending, filed, overdue"),
+  responsibleUserId: zod.number().nullish(),
+  notes: zod.string().nullish(),
+  filedAt: zod.coerce.date().nullish(),
+  responsibleUser: zod
+    .object({
+      id: zod.number(),
+      email: zod.string(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+      role: zod.string(),
+    })
+    .nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListComplianceResponse = zod.array(ListComplianceResponseItem);
+
+/**
+ * @summary Create a compliance checklist item
+ */
+export const CreateComplianceItemBody = zod.object({
+  companyId: zod.number(),
+  regime: zod.string(),
+  year: zod.number(),
+  quarter: zod.number().nullish(),
+  month: zod.number().nullish(),
+  itemKey: zod.string(),
+  itemLabel: zod.string(),
+  deadline: zod.string(),
+  status: zod.string().optional(),
+  responsibleUserId: zod.number().nullish(),
+  notes: zod.string().nullish(),
+});
+
+/**
+ * @summary Update a compliance item status/notes
+ */
+export const UpdateComplianceItemParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateComplianceItemBody = zod.object({
+  status: zod.string().optional(),
+  notes: zod.string().nullish(),
+  responsibleUserId: zod.number().nullish(),
+  deadline: zod.string().optional(),
+  filedAt: zod.string().nullish(),
+});
+
+export const UpdateComplianceItemResponse = zod.object({
+  id: zod.number(),
+  companyId: zod.number(),
+  regime: zod.string().describe("One of: germany, india"),
+  year: zod.number(),
+  quarter: zod.number().nullish(),
+  month: zod.number().nullish(),
+  itemKey: zod.string(),
+  itemLabel: zod.string(),
+  deadline: zod.string(),
+  status: zod.string().describe("One of: pending, filed, overdue"),
+  responsibleUserId: zod.number().nullish(),
+  notes: zod.string().nullish(),
+  filedAt: zod.coerce.date().nullish(),
+  responsibleUser: zod
+    .object({
+      id: zod.number(),
+      email: zod.string(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+      role: zod.string(),
+    })
+    .nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete a compliance item
+ */
+export const DeleteComplianceItemParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Seed compliance items for a company/regime/year
+ */
+export const SeedComplianceBody = zod.object({
+  companyId: zod.number(),
+  regime: zod.string().describe("One of: germany, india"),
+  year: zod.number(),
+});
+
+/**
+ * @summary Get admin/accountant summary stats (invoices, hours, offers, compliance)
+ */
+export const GetAdminDashboardStatsResponse = zod.object({
+  pendingInvoices: zod.object({
+    count: zod.number(),
+    totalAmount: zod.string(),
+  }),
+  overdueInvoices: zod.object({
+    count: zod.number(),
+    totalAmount: zod.string(),
+  }),
+  openOffers: zod.object({
+    count: zod.number(),
+  }),
+  hoursThisMonth: zod.string(),
+  upcomingCompliance: zod.number(),
+  overdueCompliance: zod.number(),
+  topPendingInvoices: zod.array(zod.object({}).passthrough()),
+  recentOpenOffers: zod.array(zod.object({}).passthrough()),
+});

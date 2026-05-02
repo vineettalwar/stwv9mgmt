@@ -5,7 +5,14 @@ import {
   useListMyTimeEntries,
   useCreateTimeEntry,
   useDeleteTimeEntry,
+  useListContracts,
+  useListInvoices,
+  useGetProjectThread,
+  useSendProjectMessage,
   getListMyTimeEntriesQueryKey,
+  getGetProjectThreadQueryKey,
+  type Invoice,
+  type Contract,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,8 +20,21 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Clock, FolderOpen, Plus, TrendingUp, Trash2, User } from "lucide-react";
+import {
+  Building2,
+  Clock,
+  FolderOpen,
+  Plus,
+  TrendingUp,
+  Trash2,
+  User,
+  MessageSquare,
+  Send,
+  FileSignature,
+  Receipt,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -157,12 +177,104 @@ function LogTimeDialog({ projects, onCreated }: { projects: Array<{ id: number; 
   );
 }
 
+function ProjectThread({ projectId, projectName }: { projectId: number; projectName: string }) {
+  const [body, setBody] = useState("");
+  const { data: me } = useGetMe();
+  const { data: thread, isLoading } = useGetProjectThread(projectId);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { mutate: sendMessage, isPending } = useSendProjectMessage({
+    mutation: {
+      onSuccess: () => {
+        setBody("");
+        queryClient.invalidateQueries({ queryKey: getGetProjectThreadQueryKey(projectId) });
+      },
+      onError: () => toast({ title: "Failed to send message", variant: "destructive" }),
+    },
+  });
+
+  const messages = thread?.messages ?? [];
+  const currentUserId = me?.id ?? -1;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-slate-500">Messages for {projectName}</p>
+      {isLoading ? (
+        <div className="space-y-2">{[1, 2].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+      ) : messages.length === 0 ? (
+        <div className="text-center py-6 text-slate-400">
+          <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-30" />
+          <p className="text-xs">No messages yet.</p>
+        </div>
+      ) : (
+        <div className="space-y-3 max-h-48 overflow-y-auto">
+          {messages.map(msg => {
+            const isMine = msg.senderId === currentUserId;
+            const senderName = [msg.senderFirstName, msg.senderLastName].filter(Boolean).join(" ") || msg.senderEmail;
+            return (
+              <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[80%] rounded-lg p-2.5 text-xs ${isMine ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-800"}`}>
+                  {!isMine && <p className="font-semibold mb-1 text-slate-600">{senderName}</p>}
+                  <p>{msg.body}</p>
+                  <p className="mt-1 text-[10px] text-slate-400">{new Date(msg.createdAt).toLocaleString()}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Textarea
+          value={body}
+          onChange={e => setBody(e.target.value)}
+          placeholder="Write a message..."
+          className="resize-none text-xs min-h-[48px]"
+          data-testid={`input-freelancer-message-${projectId}`}
+        />
+        <Button
+          size="sm"
+          disabled={isPending || !body.trim()}
+          onClick={() => {
+            if (!body.trim()) return;
+            sendMessage({ id: projectId, data: { body: body.trim() } });
+          }}
+          className="self-end"
+          data-testid={`button-send-freelancer-message-${projectId}`}
+        >
+          <Send className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+const CONTRACT_STATUS: Record<string, { label: string; className: string }> = {
+  draft: { label: "Draft", className: "bg-slate-100 text-slate-600" },
+  sent: { label: "Sent", className: "bg-blue-100 text-blue-800" },
+  signed: { label: "Signed", className: "bg-emerald-100 text-emerald-800" },
+  cancelled: { label: "Cancelled", className: "bg-slate-100 text-slate-500" },
+};
+
+const INVOICE_STATUS: Record<string, { label: string; className: string }> = {
+  draft: { label: "Draft", className: "bg-slate-100 text-slate-600" },
+  sent: { label: "Sent", className: "bg-blue-100 text-blue-800" },
+  paid: { label: "Paid", className: "bg-emerald-100 text-emerald-800" },
+  overdue: { label: "Overdue", className: "bg-red-100 text-red-800" },
+  cancelled: { label: "Cancelled", className: "bg-slate-100 text-slate-500" },
+};
+
+type TabKey = "time" | "projects" | "contracts" | "invoices" | "messages";
+
 export default function FreelancerPortal() {
   const { data: me, isLoading: meLoading } = useGetMe();
   const { data: projects, isLoading: projectsLoading } = useListProjects();
+  const { data: contracts, isLoading: contractsLoading } = useListContracts();
+  const { data: invoices, isLoading: invoicesLoading } = useListInvoices();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [month, setMonth] = useState(getCurrentMonth());
+  const [activeTab, setActiveTab] = useState<TabKey>("time");
 
   const { data: entries, isLoading: entriesLoading } = useListMyTimeEntries({ month });
 
@@ -178,6 +290,16 @@ export default function FreelancerPortal() {
 
   const assignedCompanies = me?.companies ?? [];
   const totalHours = (entries ?? []).reduce((sum, e) => sum + parseFloat(e.hours || "0"), 0);
+  const myContracts = (contracts ?? []).filter(c => c.clientId === me?.id);
+  const myInvoices = (invoices ?? []).filter(inv => inv.clientId === me?.id);
+
+  const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
+    { key: "time", label: "Time Log", icon: Clock },
+    { key: "projects", label: "Projects", icon: FolderOpen },
+    { key: "contracts", label: "Contracts", icon: FileSignature },
+    { key: "invoices", label: "Invoices", icon: Receipt },
+    { key: "messages", label: "Messages", icon: MessageSquare },
+  ];
 
   // Earnings: sum(hours × hourlyRate) for entries that have a rate set
   const { totalEarnings, hasRates } = (entries ?? []).reduce(
@@ -195,9 +317,7 @@ export default function FreelancerPortal() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Freelancer Portal
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Freelancer Portal</h1>
           <p className="text-sm text-slate-500">
             Welcome back{me?.firstName ? `, ${me.firstName}` : ""}. Track your work here.
           </p>
@@ -208,6 +328,7 @@ export default function FreelancerPortal() {
         />
       </div>
 
+      {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -222,7 +343,6 @@ export default function FreelancerPortal() {
             )}
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-slate-600">Hours This Month</CardTitle>
@@ -236,7 +356,6 @@ export default function FreelancerPortal() {
             )}
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-slate-600">Est. Earnings</CardTitle>
@@ -268,88 +387,216 @@ export default function FreelancerPortal() {
             )}
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-slate-600">Contracts</CardTitle>
+            <FileSignature className="h-4 w-4 text-slate-400" />
+          </CardHeader>
+          <CardContent>
+            {contractsLoading ? <Skeleton className="h-8 w-12" /> : (
+              <div className="text-2xl font-bold text-slate-900" data-testid="stat-contracts">
+                {myContracts.length}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Projects */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2">
-            <FolderOpen className="h-4 w-4" /> Your Projects
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {projectsLoading ? (
-            <div className="space-y-2">{[1, 2].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
-          ) : (projects ?? []).length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
-              <FolderOpen className="h-10 w-10 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No projects assigned yet.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {(projects ?? []).map(p => (
-                <div key={p.id} className="flex items-center justify-between py-2 px-3 rounded-md border border-slate-100 bg-slate-50">
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">{p.name}</p>
-                    <p className="text-xs text-slate-500">{p.company?.name ?? ""}</p>
-                  </div>
-                  <Badge variant="secondary" className={p.status === "active" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}>
-                    {p.status}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Tabs */}
+      <div className="border-b border-slate-200">
+        <nav className="-mb-px flex gap-4">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                data-testid={`tab-freelancer-${tab.key}`}
+                className={`flex items-center gap-1.5 pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === tab.key
+                    ? "border-slate-800 text-slate-800"
+                    : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
 
-      {/* Time Entries */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium text-slate-600 flex items-center justify-between">
-            <span className="flex items-center gap-2"><Clock className="h-4 w-4" /> Time Entries</span>
-            <Input
-              type="month"
-              value={month}
-              onChange={e => setMonth(e.target.value)}
-              className="w-36 h-7 text-xs"
-              data-testid="input-freelancer-month"
-            />
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {entriesLoading ? (
-            <div className="space-y-2">{[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
-          ) : (entries ?? []).length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
-              <Clock className="h-10 w-10 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No time entries for this month. Use Log Time to add one.</p>
+      {/* Time Log Tab */}
+      {activeTab === "time" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-slate-600 flex items-center justify-between">
+              <span className="flex items-center gap-2"><Clock className="h-4 w-4" /> Time Entries</span>
+              <Input
+                type="month"
+                value={month}
+                onChange={e => setMonth(e.target.value)}
+                className="w-36 h-7 text-xs"
+                data-testid="input-freelancer-month"
+              />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {entriesLoading ? (
+              <div className="space-y-2">{[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
+            ) : (entries ?? []).length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                <Clock className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">No time entries for this month. Use Log Time to add one.</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {[...(entries ?? [])].sort((a, b) => b.date.localeCompare(a.date)).map(e => (
+                  <div key={e.id} data-testid={`row-freelancer-entry-${e.id}`} className="flex items-center gap-3 py-2 border-b border-slate-100 last:border-0">
+                    <span className="text-xs text-slate-400 w-20 flex-shrink-0">{e.date}</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-800">{e.projectName}</p>
+                      {e.description && <p className="text-xs text-slate-500">{e.description}</p>}
+                    </div>
+                    <span className="text-sm font-semibold text-slate-700">{parseFloat(e.hours).toFixed(1)}h</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-slate-400 hover:text-red-500"
+                      onClick={() => deleteEntry({ id: e.projectId, entryId: e.id })}
+                      data-testid={`button-delete-freelancer-entry-${e.id}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Projects Tab */}
+      {activeTab === "projects" && (
+        <Card>
+          <CardContent className="pt-4">
+            {projectsLoading ? (
+              <div className="space-y-2">{[1, 2].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+            ) : (projects ?? []).length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                <FolderOpen className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">No projects assigned yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {(projects ?? []).map(p => (
+                  <div key={p.id} className="flex items-center justify-between py-2 px-3 rounded-md border border-slate-100 bg-slate-50">
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">{p.name}</p>
+                      <p className="text-xs text-slate-500">{p.company?.name ?? ""}</p>
+                    </div>
+                    <Badge variant="secondary" className={p.status === "active" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}>
+                      {p.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Contracts Tab */}
+      {activeTab === "contracts" && (
+        <Card>
+          <CardContent className="pt-4">
+            {contractsLoading ? (
+              <div className="space-y-2">{[1, 2].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+            ) : myContracts.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                <FileSignature className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">No contracts assigned to you yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {myContracts.map(contract => {
+                  const statusInfo = CONTRACT_STATUS[contract.status] ?? CONTRACT_STATUS.draft!;
+                  return (
+                    <div key={contract.id} data-testid={`row-freelancer-contract-${contract.id}`} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">{contract.title}</p>
+                        <p className="text-xs text-slate-500">{contract.contractNumber} · {contract.type.replace("_", " ")}</p>
+                      </div>
+                      <Badge className={statusInfo.className}>{statusInfo.label}</Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Invoices Tab */}
+      {activeTab === "invoices" && (
+        <Card>
+          <CardContent className="pt-4">
+            {invoicesLoading ? (
+              <div className="space-y-2">{[1, 2].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+            ) : myInvoices.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                <Receipt className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">No invoices found.</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {myInvoices.map(inv => {
+                  const statusInfo = INVOICE_STATUS[inv.status] ?? INVOICE_STATUS.draft!;
+                  return (
+                    <div key={inv.id} data-testid={`row-freelancer-invoice-${inv.id}`} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">{inv.title}</p>
+                        <p className="text-xs text-slate-500">{inv.invoiceNumber} · {inv.issueDate}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-semibold text-slate-700">{inv.currency} {parseFloat(inv.totalAmount).toLocaleString("en", { minimumFractionDigits: 2 })}</span>
+                        <Badge className={statusInfo.className}>{statusInfo.label}</Badge>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Messages Tab */}
+      {activeTab === "messages" && (
+        <div className="space-y-4">
+          {projectsLoading ? (
+            <div className="space-y-3">{[1, 2].map(i => <Skeleton key={i} className="h-32 w-full" />)}</div>
+          ) : (projects ?? []).length === 0 ? (
+            <div className="rounded-lg border border-slate-200 bg-white p-12 text-center">
+              <MessageSquare className="mx-auto h-12 w-12 text-slate-300" />
+              <p className="mt-2 text-sm text-slate-500">No projects assigned yet.</p>
             </div>
           ) : (
-            <div className="space-y-1">
-              {[...(entries ?? [])].sort((a, b) => b.date.localeCompare(a.date)).map(e => (
-                <div key={e.id} data-testid={`row-freelancer-entry-${e.id}`} className="flex items-center gap-3 py-2 border-b border-slate-100 last:border-0">
-                  <span className="text-xs text-slate-400 w-20 flex-shrink-0">{e.date}</span>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-800">{e.projectName}</p>
-                    {e.description && <p className="text-xs text-slate-500">{e.description}</p>}
-                  </div>
-                  <span className="text-sm font-semibold text-slate-700">{parseFloat(e.hours).toFixed(1)}h</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 text-slate-400 hover:text-red-500"
-                    onClick={() => deleteEntry({ id: e.projectId, entryId: e.id })}
-                    data-testid={`button-delete-freelancer-entry-${e.id}`}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ))}
-            </div>
+            (projects ?? []).map(p => (
+              <Card key={p.id}>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" /> {p.name}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ProjectThread projectId={p.id} projectName={p.name} />
+                </CardContent>
+              </Card>
+            ))
           )}
-        </CardContent>
-      </Card>
+        </div>
+      )}
     </div>
   );
 }

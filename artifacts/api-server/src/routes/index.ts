@@ -12,6 +12,10 @@ import todosRouter from "./todos";
 import offersRouter from "./offers";
 import contractsRouter from "./contracts";
 import invoicesRouter from "./invoices";
+import messagesRouter from "./messages";
+import notificationsRouter from "./notifications";
+import complianceRouter from "./compliance";
+import adminDashboardRouter from "./adminDashboard";
 
 const router: IRouter = Router();
 
@@ -20,6 +24,7 @@ router.use(companiesRouter);
 router.use(usersRouter);
 router.use(adminUsersRouter);
 router.use(dashboardRouter);
+router.use(adminDashboardRouter);
 router.use(projectsRouter);
 router.use(timeEntriesRouter);
 router.use(deliverablesRouter);
@@ -28,5 +33,8 @@ router.use(todosRouter);
 router.use(offersRouter);
 router.use(contractsRouter);
 router.use(invoicesRouter);
+router.use(messagesRouter);
+router.use(notificationsRouter);
+router.use(complianceRouter);
 
 export default router;

@@ -69,6 +69,18 @@ lib/
 ### todos
 - id, projectId (nullable), clientId (nullable), title, description (nullable), priority (low|medium|high), status (open|done), assigneeId (nullable), dueDate (nullable), completedAt (nullable), createdAt, updatedAt
 
+### messageThreads
+- id, projectId, subject (nullable), createdAt, updatedAt
+
+### messages
+- id, threadId, senderId, body, attachmentUrl (nullable), attachmentName (nullable), attachmentType (nullable), isRead (boolean), createdAt
+
+### notifications
+- id, userId, type (new_message|deliverable_update|invoice_issued|offer_sent|contract_ready), title, body, entityType (nullable), entityId (nullable), isRead, createdAt, updatedAt
+
+### complianceChecklists
+- id, companyId, regime (germany|india), year, quarter (nullable), month (nullable), itemKey, itemLabel, deadline (YYYY-MM-DD), status (pending|filed|overdue), responsibleUserId (nullable), notes (nullable), filedAt (nullable), createdAt, updatedAt
+
 ## Seeded Companies
 
 1. STWV UG — Germany, VAT, EUR
@@ -106,6 +118,21 @@ All routes require Clerk auth (Bearer token). Prefix: `/api`
 - `GET|POST /todos` — list (role-filtered) / create
 - `PATCH|DELETE /todos/:id` — update / delete todo
 
+### Messages, Notifications & Compliance (Task 4)
+- `GET /projects/:id/thread` — get or auto-create message thread for a project
+- `POST /projects/:id/messages` — send a message (notifies project participants)
+- `PATCH /projects/:id/messages/:messageId/read` — mark message as read
+- `GET /notifications` — list notifications for current user
+- `PATCH /notifications/read-all` — mark all notifications read
+- `PATCH /notifications/:id/read` — mark one notification read
+- `DELETE /notifications/:id` — delete a notification
+- `GET /compliance` — list compliance items (filterable by regime, companyId, year)
+- `POST /compliance` — create a compliance item
+- `PATCH /compliance/:id` — update status/notes/filedAt
+- `DELETE /compliance/:id` — delete item (admin only)
+- `POST /compliance/seed` — seed Germany or India checklist for a company/year
+- `GET /dashboard/admin-stats` — financial overview (pending/overdue invoices, open offers, hours, compliance)
+
 ### Offers, Contracts & Invoices (Task 3)
 - `GET|POST /offers` — list / create offers
 - `GET|PATCH|DELETE /offers/:id` — detail / update / delete
@@ -134,12 +161,14 @@ All routes require Clerk auth (Bearer token). Prefix: `/api`
 - `/projects/:id` — tabbed detail: Overview, Deliverables (Kanban), Milestones, Time Entries, Billing Cycle
 - `/time-tracking` — personal time log; admins/accountants see all entries
 - `/todos` — task list with priority, due date, toggle done; role-filtered
-- `/client-portal` — client view: their projects + deliverable status
-- `/freelancer-portal` — freelancer view: assigned projects + time log
+- `/client-portal` — client tabbed view: Projects (with deliverable progress), Invoices, Offers, Contracts, Messages (per-project thread)
+- `/freelancer-portal` — freelancer tabbed view: Time Log, Projects, Contracts, Invoices, Messages (per-project thread)
 - `/documents` — Document Centre: unified cross-entity view of all offers, contracts, and invoices with filtering by type/company/project/client
 - `/offers` — offer builder; create/send/accept offers with line items and PDF export; offer→contract conversion
 - `/contracts` — contract management; create from offer or scratch, sign/execute, PDF export; contract templates
 - `/invoices` — multi-entity invoice management with German VAT (19%) and Indian GST (CGST+SGST/IGST/none based on intra/inter-state auto-detection); DATEV CSV export (admin/germany_accountant), Tally XML/CSV export (admin/india_accountant); recurring invoice scheduler (auto-clones every 6h)
+- `/communication-hub` — per-project message threads; all roles (admin, PM, accountant, client, freelancer) can read and send; auto-creates thread on first access; sends notifications to project participants
+- `/compliance` — tax compliance checklist for Germany (quarterly VAT + annual Körperschaftsteuer + Gewerbesteuer) and India (monthly GSTR-3B + quarterly GSTR-1); seed by company/regime/year; toggle filed status; admin/accountant only
 
 ## Auth Notes
 

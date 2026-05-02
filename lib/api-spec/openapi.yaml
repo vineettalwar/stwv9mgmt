@@ -33,6 +33,12 @@ tags:
     description: Contract management
   - name: invoices
     description: Invoice management and export
+  - name: messages
+    description: Project message threads and communication hub
+  - name: notifications
+    description: User notifications
+  - name: compliance
+    description: Compliance checklists for Germany and India
 paths:
   /healthz:
     get:
@@ -1463,6 +1469,262 @@ paths:
               schema:
                 type: string
 
+  # ───── MESSAGES ─────
+  /projects/{id}/thread:
+    get:
+      operationId: getProjectThread
+      tags: [messages]
+      summary: Get or create the message thread for a project
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Thread with messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectThread"
+
+  /projects/{id}/messages:
+    post:
+      operationId: sendProjectMessage
+      tags: [messages]
+      summary: Send a message in the project thread
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageBody"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  /projects/{id}/messages/{messageId}/read:
+    patch:
+      operationId: markMessageRead
+      tags: [messages]
+      summary: Mark a message as read
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Marked as read
+
+  # ───── NOTIFICATIONS ─────
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications for current user
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/read-all:
+    patch:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204":
+          description: Done
+
+  /notifications/{id}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Done
+
+  /notifications/{id}:
+    delete:
+      operationId: deleteNotification
+      tags: [notifications]
+      summary: Delete a notification
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ───── COMPLIANCE ─────
+  /compliance:
+    get:
+      operationId: listCompliance
+      tags: [compliance]
+      summary: List compliance checklist items
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: companyId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: regime
+          in: query
+          required: false
+          schema:
+            type: string
+            description: "germany or india"
+        - name: year
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of compliance items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ComplianceItem"
+    post:
+      operationId: createComplianceItem
+      tags: [compliance]
+      summary: Create a compliance checklist item
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateComplianceItemBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComplianceItem"
+
+  /compliance/{id}:
+    patch:
+      operationId: updateComplianceItem
+      tags: [compliance]
+      summary: Update a compliance item status/notes
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateComplianceItemBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComplianceItem"
+    delete:
+      operationId: deleteComplianceItem
+      tags: [compliance]
+      summary: Delete a compliance item
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /compliance/seed:
+    post:
+      operationId: seedCompliance
+      tags: [compliance]
+      summary: Seed compliance items for a company/regime/year
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SeedComplianceBody"
+      responses:
+        "201":
+          description: Items seeded
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ComplianceItem"
+
+  # ───── ADMIN DASHBOARD ─────
+  /dashboard/admin-stats:
+    get:
+      operationId: getAdminDashboardStats
+      tags: [dashboard]
+      summary: Get admin/accountant summary stats (invoices, hours, offers, compliance)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Admin dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminDashboardStats"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2579,6 +2841,300 @@ components:
           type: string
         isDefault:
           type: boolean
+
+    # ─── Messages ───
+    MessageThread:
+      type: object
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        subject:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - projectId
+        - createdAt
+        - updatedAt
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+        threadId:
+          type: integer
+        senderId:
+          type: integer
+        body:
+          type: string
+        attachmentUrl:
+          type: ["string", "null"]
+        attachmentName:
+          type: ["string", "null"]
+        attachmentType:
+          type: ["string", "null"]
+        isRead:
+          type: boolean
+        senderEmail:
+          type: string
+        senderFirstName:
+          type: ["string", "null"]
+        senderLastName:
+          type: ["string", "null"]
+        senderRole:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - threadId
+        - senderId
+        - body
+        - isRead
+        - senderEmail
+        - senderRole
+        - createdAt
+
+    ProjectThread:
+      type: object
+      properties:
+        thread:
+          $ref: "#/components/schemas/MessageThread"
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+      required:
+        - thread
+        - messages
+
+    SendMessageBody:
+      type: object
+      properties:
+        body:
+          type: string
+        attachmentUrl:
+          type: ["string", "null"]
+        attachmentName:
+          type: ["string", "null"]
+        attachmentType:
+          type: ["string", "null"]
+      required:
+        - body
+
+    # ─── Notifications ───
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        type:
+          type: string
+          description: "One of: new_message, deliverable_update, invoice_issued, offer_sent, contract_ready"
+        title:
+          type: string
+        body:
+          type: string
+        entityType:
+          type: ["string", "null"]
+        entityId:
+          type: ["integer", "null"]
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - type
+        - title
+        - body
+        - isRead
+        - createdAt
+
+    # ─── Compliance ───
+    ComplianceItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        companyId:
+          type: integer
+        regime:
+          type: string
+          description: "One of: germany, india"
+        year:
+          type: integer
+        quarter:
+          type: ["integer", "null"]
+        month:
+          type: ["integer", "null"]
+        itemKey:
+          type: string
+        itemLabel:
+          type: string
+        deadline:
+          type: string
+        status:
+          type: string
+          description: "One of: pending, filed, overdue"
+        responsibleUserId:
+          type: ["integer", "null"]
+        notes:
+          type: ["string", "null"]
+        filedAt:
+          type: ["string", "null"]
+          format: date-time
+        responsibleUser:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/UserBasic"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - companyId
+        - regime
+        - year
+        - itemKey
+        - itemLabel
+        - deadline
+        - status
+        - createdAt
+        - updatedAt
+
+    CreateComplianceItemBody:
+      type: object
+      properties:
+        companyId:
+          type: integer
+        regime:
+          type: string
+        year:
+          type: integer
+        quarter:
+          type: ["integer", "null"]
+        month:
+          type: ["integer", "null"]
+        itemKey:
+          type: string
+        itemLabel:
+          type: string
+        deadline:
+          type: string
+        status:
+          type: string
+        responsibleUserId:
+          type: ["integer", "null"]
+        notes:
+          type: ["string", "null"]
+      required:
+        - companyId
+        - regime
+        - year
+        - itemKey
+        - itemLabel
+        - deadline
+
+    UpdateComplianceItemBody:
+      type: object
+      properties:
+        status:
+          type: string
+        notes:
+          type: ["string", "null"]
+        responsibleUserId:
+          type: ["integer", "null"]
+        deadline:
+          type: string
+        filedAt:
+          type: ["string", "null"]
+
+    SeedComplianceBody:
+      type: object
+      properties:
+        companyId:
+          type: integer
+        regime:
+          type: string
+          description: "One of: germany, india"
+        year:
+          type: integer
+      required:
+        - companyId
+        - regime
+        - year
+
+    # ─── Admin Dashboard ───
+    AdminDashboardStats:
+      type: object
+      properties:
+        pendingInvoices:
+          type: object
+          properties:
+            count:
+              type: integer
+            totalAmount:
+              type: string
+          required:
+            - count
+            - totalAmount
+        overdueInvoices:
+          type: object
+          properties:
+            count:
+              type: integer
+            totalAmount:
+              type: string
+          required:
+            - count
+            - totalAmount
+        openOffers:
+          type: object
+          properties:
+            count:
+              type: integer
+          required:
+            - count
+        hoursThisMonth:
+          type: string
+        upcomingCompliance:
+          type: integer
+        overdueCompliance:
+          type: integer
+        topPendingInvoices:
+          type: array
+          items:
+            type: object
+        recentOpenOffers:
+          type: array
+          items:
+            type: object
+      required:
+        - pendingInvoices
+        - overdueInvoices
+        - openOffers
+        - hoursThisMonth
+        - upcomingCompliance
+        - overdueCompliance
+        - topPendingInvoices
+        - recentOpenOffers
 
     # ─── Invoices ───
     InvoiceLineItem:

@@ -595,6 +595,161 @@ export interface UpdateContractTemplateBody {
   isDefault?: boolean;
 }
 
+export interface MessageThread {
+  id: number;
+  projectId: number;
+  /** @nullable */
+  subject?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Message {
+  id: number;
+  threadId: number;
+  senderId: number;
+  body: string;
+  /** @nullable */
+  attachmentUrl?: string | null;
+  /** @nullable */
+  attachmentName?: string | null;
+  /** @nullable */
+  attachmentType?: string | null;
+  isRead: boolean;
+  senderEmail: string;
+  /** @nullable */
+  senderFirstName?: string | null;
+  /** @nullable */
+  senderLastName?: string | null;
+  senderRole: string;
+  createdAt: string;
+}
+
+export interface ProjectThread {
+  thread: MessageThread;
+  messages: Message[];
+}
+
+export interface SendMessageBody {
+  body: string;
+  /** @nullable */
+  attachmentUrl?: string | null;
+  /** @nullable */
+  attachmentName?: string | null;
+  /** @nullable */
+  attachmentType?: string | null;
+}
+
+export interface Notification {
+  id: number;
+  userId: number;
+  /** One of: new_message, deliverable_update, invoice_issued, offer_sent, contract_ready */
+  type: string;
+  title: string;
+  body: string;
+  /** @nullable */
+  entityType?: string | null;
+  /** @nullable */
+  entityId?: number | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface ComplianceItem {
+  id: number;
+  companyId: number;
+  /** One of: germany, india */
+  regime: string;
+  year: number;
+  /** @nullable */
+  quarter?: number | null;
+  /** @nullable */
+  month?: number | null;
+  itemKey: string;
+  itemLabel: string;
+  deadline: string;
+  /** One of: pending, filed, overdue */
+  status: string;
+  /** @nullable */
+  responsibleUserId?: number | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  filedAt?: string | null;
+  responsibleUser?: UserBasic | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateComplianceItemBody {
+  companyId: number;
+  regime: string;
+  year: number;
+  /** @nullable */
+  quarter?: number | null;
+  /** @nullable */
+  month?: number | null;
+  itemKey: string;
+  itemLabel: string;
+  deadline: string;
+  status?: string;
+  /** @nullable */
+  responsibleUserId?: number | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface UpdateComplianceItemBody {
+  status?: string;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  responsibleUserId?: number | null;
+  deadline?: string;
+  /** @nullable */
+  filedAt?: string | null;
+}
+
+export interface SeedComplianceBody {
+  companyId: number;
+  /** One of: germany, india */
+  regime: string;
+  year: number;
+}
+
+export type AdminDashboardStatsPendingInvoices = {
+  count: number;
+  totalAmount: string;
+};
+
+export type AdminDashboardStatsOverdueInvoices = {
+  count: number;
+  totalAmount: string;
+};
+
+export type AdminDashboardStatsOpenOffers = {
+  count: number;
+};
+
+export type AdminDashboardStatsTopPendingInvoicesItem = {
+  [key: string]: unknown;
+};
+
+export type AdminDashboardStatsRecentOpenOffersItem = {
+  [key: string]: unknown;
+};
+
+export interface AdminDashboardStats {
+  pendingInvoices: AdminDashboardStatsPendingInvoices;
+  overdueInvoices: AdminDashboardStatsOverdueInvoices;
+  openOffers: AdminDashboardStatsOpenOffers;
+  hoursThisMonth: string;
+  upcomingCompliance: number;
+  overdueCompliance: number;
+  topPendingInvoices: AdminDashboardStatsTopPendingInvoicesItem[];
+  recentOpenOffers: AdminDashboardStatsRecentOpenOffersItem[];
+}
+
 export interface InvoiceLineItem {
   id: number;
   invoiceId: number;
@@ -736,4 +891,13 @@ export type ExportTallyParams = {
    * xml or csv
    */
   format?: string;
+};
+
+export type ListComplianceParams = {
+  companyId?: number;
+  /**
+   * germany or india
+   */
+  regime?: string;
+  year?: number;
 };

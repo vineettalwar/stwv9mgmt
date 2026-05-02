@@ -13,6 +13,8 @@ import {
   FileSignature,
   Receipt,
   Archive,
+  MessageSquare,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClerk } from "@clerk/react";
@@ -105,6 +107,20 @@ const navigation: NavItem[] = [
     icon: Receipt,
     testId: "nav-invoices",
     allowedRoles: ["admin", "germany_accountant", "india_accountant", "project_manager"],
+  },
+  {
+    name: "Communication Hub",
+    href: "/communication-hub",
+    icon: MessageSquare,
+    testId: "nav-communication-hub",
+    allowedRoles: ["admin", "germany_accountant", "india_accountant", "project_manager", "client", "freelancer"],
+  },
+  {
+    name: "Compliance",
+    href: "/compliance",
+    icon: Shield,
+    testId: "nav-compliance",
+    allowedRoles: ["admin", "germany_accountant", "india_accountant"],
   },
   {
     name: "My Portal",
