@@ -3,21 +3,21 @@
  *
  * Seeds the 4 STWV company entities (idempotent).
  *
- * ADMIN USER SETUP
- * ─────────────────
- * There is no hard-coded admin user because the Clerk user ID is only
- * known after the person signs up. Two ways to bootstrap an admin:
+ * ADMIN USER BOOTSTRAP
+ * ─────────────────────
+ * Set env vars before running to seed a default admin user:
  *
- * Option A (recommended): Set the PLATFORM_ADMIN_EMAILS environment variable
- * in Replit Secrets to a comma-separated list of admin email addresses.
- *   e.g.  PLATFORM_ADMIN_EMAILS=vineet@stwv.de,admin@stwv.de
- * Any user who signs up with one of those emails is automatically assigned
- * the "admin" role via the POST /users self-registration endpoint.
+ *   PLATFORM_ADMIN_CLERK_ID=user_2abc123...   (from Clerk Dashboard → Users)
+ *   PLATFORM_ADMIN_EMAIL=vineet@stwv.de
  *
- * Option B: After any user signs up, an existing admin can promote them
- * via PATCH /api/users/:id  { "role": "admin" }.
+ * When both are set, this script inserts an admin user record.
+ * This record is linked when the admin signs in via Clerk (matching by clerkUserId).
+ *
+ * Alternatively, set PLATFORM_ADMIN_EMAILS=email1,email2 as a Replit Secret.
+ * Any user whose Clerk-verified email matches that list is auto-promoted to admin
+ * on first sign-in — no seed required.
  */
-import { db, companiesTable } from "./index";
+import { db, companiesTable, usersTable } from "./index";
 
 const companies = [
   {
@@ -68,6 +68,8 @@ const companies = [
 
 async function seed() {
   console.log("Seeding database...");
+
+  // ── Companies ──
   for (const company of companies) {
     const result = await db
       .insert(companiesTable)
@@ -80,10 +82,36 @@ async function seed() {
       console.log(`  Skipped (already exists): ${company.name}`);
     }
   }
-  console.log("Seed complete.");
-  console.log("");
-  console.log("ADMIN SETUP: Set PLATFORM_ADMIN_EMAILS env var to auto-promote admin users.");
-  console.log("  Example: PLATFORM_ADMIN_EMAILS=vineet@stwv.de,admin@stwv.de");
+
+  // ── Default admin user ──
+  const adminClerkId = process.env.PLATFORM_ADMIN_CLERK_ID?.trim();
+  const adminEmail = process.env.PLATFORM_ADMIN_EMAIL?.trim();
+
+  if (adminClerkId && adminEmail) {
+    console.log(`\nSeeding default admin: ${adminEmail} (${adminClerkId})`);
+    const result = await db
+      .insert(usersTable)
+      .values({
+        clerkUserId: adminClerkId,
+        email: adminEmail,
+        firstName: "Admin",
+        lastName: null,
+        role: "admin",
+        isActive: true,
+      })
+      .onConflictDoNothing()
+      .returning({ id: usersTable.id, email: usersTable.email });
+    if (result.length > 0) {
+      console.log(`  Inserted admin user: ${adminEmail} (id=${result[0].id})`);
+    } else {
+      console.log(`  Skipped (already exists): ${adminEmail}`);
+    }
+  } else {
+    console.log("\nAdmin user not seeded — set PLATFORM_ADMIN_CLERK_ID and PLATFORM_ADMIN_EMAIL to seed one.");
+    console.log("  Alternative: set PLATFORM_ADMIN_EMAILS=email1,email2 (auto-promotes on first sign-in).");
+  }
+
+  console.log("\nSeed complete.");
 }
 
 seed().catch((err) => {

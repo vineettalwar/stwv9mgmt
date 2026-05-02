@@ -19,7 +19,18 @@ import SignUpPage from "@/pages/sign-up";
 import ClientPortal from "@/pages/client-portal";
 import FreelancerPortal from "@/pages/freelancer-portal";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => {
+        // Don't retry on 401/403
+        const e = error as { status?: number };
+        if (e?.status === 401 || e?.status === 403) return false;
+        return failureCount < 2;
+      },
+    },
+  },
+});
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 type UserRole =
@@ -51,6 +62,11 @@ function ClerkProviderWithRouter({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * PrivateRoute guards a page by auth state and role.
+ * useGetMe() hits GET /users/me which auto-provisions the user on first visit —
+ * so new Clerk users are automatically added to the platform DB.
+ */
 function PrivateRoute({
   component: Component,
   allowedRoles,
@@ -61,24 +77,21 @@ function PrivateRoute({
   const { isSignedIn, isLoaded } = useAuth();
   const { data: me, isLoading: meLoading } = useGetMe();
 
-  if (!isLoaded) {
+  if (!isLoaded || (isSignedIn && meLoading && !me)) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400 text-sm">
-        Loading...
+        Loading…
       </div>
     );
   }
 
-  if (!isSignedIn) {
-    return <RedirectToSignIn />;
-  }
+  if (!isSignedIn) return <RedirectToSignIn />;
 
-  if (allowedRoles && !meLoading && me) {
-    const userRole = me.role as UserRole;
-    if (!allowedRoles.includes(userRole)) {
-      // Redirect client/freelancer to their portals; others to settings
-      if (userRole === "client") return <Redirect to="/client-portal" replace />;
-      if (userRole === "freelancer") return <Redirect to="/freelancer-portal" replace />;
+  if (allowedRoles && me) {
+    const role = me.role as UserRole;
+    if (!allowedRoles.includes(role)) {
+      if (role === "client") return <Redirect to="/client-portal" replace />;
+      if (role === "freelancer") return <Redirect to="/freelancer-portal" replace />;
       return <Redirect to="/settings" replace />;
     }
   }
@@ -90,6 +103,10 @@ function PrivateRoute({
   );
 }
 
+/**
+ * SmartRedirect: sends authenticated users to the correct home based on role.
+ * Relies on useGetMe() which auto-provisions the user record on first sign-in.
+ */
 function SmartRedirect() {
   const { isSignedIn, isLoaded } = useAuth();
   const { data: me, isLoading: meLoading } = useGetMe();
@@ -106,28 +123,16 @@ function SmartRedirect() {
 
   return (
     <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400 text-sm">
-      Loading...
+      Loading…
     </div>
   );
 }
 
 const ADMIN_ONLY: UserRole[] = ["admin"];
-const STAFF_ROLES: UserRole[] = [
-  "admin",
-  "germany_accountant",
-  "india_accountant",
-  "project_manager",
-];
+const STAFF_ROLES: UserRole[] = ["admin", "germany_accountant", "india_accountant", "project_manager"];
 const CLIENT_ONLY: UserRole[] = ["client"];
 const FREELANCER_ONLY: UserRole[] = ["freelancer"];
-const ALL_ROLES: UserRole[] = [
-  "admin",
-  "germany_accountant",
-  "india_accountant",
-  "project_manager",
-  "client",
-  "freelancer",
-];
+const ALL_ROLES: UserRole[] = ["admin", "germany_accountant", "india_accountant", "project_manager", "client", "freelancer"];
 
 function Router() {
   return (
