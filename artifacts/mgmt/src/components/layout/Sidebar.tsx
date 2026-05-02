@@ -15,6 +15,7 @@ import {
   Archive,
   MessageSquare,
   Shield,
+  GitCommitHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClerk } from "@clerk/react";
@@ -85,6 +86,13 @@ const navigation: NavItem[] = [
     href: "/documents",
     icon: Archive,
     testId: "nav-documents",
+    allowedRoles: ["admin", "germany_accountant", "india_accountant", "project_manager"],
+  },
+  {
+    name: "Pipeline",
+    href: "/pipeline",
+    icon: GitCommitHorizontal,
+    testId: "nav-pipeline",
     allowedRoles: ["admin", "germany_accountant", "india_accountant", "project_manager"],
   },
   {

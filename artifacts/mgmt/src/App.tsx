@@ -30,6 +30,7 @@ import InvoiceNew from "@/pages/invoice-new";
 import DocumentCentre from "@/pages/document-centre";
 import CommunicationHub from "@/pages/communication-hub";
 import Compliance from "@/pages/compliance";
+import Pipeline from "@/pages/pipeline";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -156,6 +157,7 @@ function Router() {
       <Route path="/time-tracking" component={() => <PrivateRoute component={TimeTracking} allowedRoles={WORKER_ROLES} />} />
       <Route path="/todos" component={() => <PrivateRoute component={Todos} allowedRoles={STAFF_ROLES} />} />
       <Route path="/documents" component={() => <PrivateRoute component={DocumentCentre} allowedRoles={STAFF_ROLES} />} />
+      <Route path="/pipeline" component={() => <PrivateRoute component={Pipeline} allowedRoles={STAFF_ROLES} />} />
       <Route path="/offers" component={() => <PrivateRoute component={Offers} allowedRoles={STAFF_ROLES} />} />
       <Route path="/contracts" component={() => <PrivateRoute component={Contracts} allowedRoles={STAFF_ROLES} />} />
       <Route path="/invoices/new" component={() => <PrivateRoute component={InvoiceNew} allowedRoles={STAFF_ROLES} />} />
