@@ -5,6 +5,8 @@ import {
   LayoutDashboard,
   Settings,
   LogOut,
+  Briefcase,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClerk } from "@clerk/react";
@@ -23,6 +25,7 @@ type NavItem = {
   name: string;
   href: string;
   icon: React.ElementType;
+  testId: string;
   allowedRoles: UserRole[];
 };
 
@@ -31,34 +34,42 @@ const navigation: NavItem[] = [
     name: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
-    allowedRoles: [
-      "admin",
-      "germany_accountant",
-      "india_accountant",
-      "project_manager",
-    ],
+    testId: "nav-dashboard",
+    allowedRoles: ["admin", "germany_accountant", "india_accountant", "project_manager"],
   },
   {
     name: "Companies",
     href: "/companies",
     icon: Building2,
-    allowedRoles: [
-      "admin",
-      "germany_accountant",
-      "india_accountant",
-      "project_manager",
-    ],
+    testId: "nav-companies",
+    allowedRoles: ["admin", "germany_accountant", "india_accountant", "project_manager"],
   },
   {
     name: "Users",
     href: "/users",
     icon: Users,
+    testId: "nav-users",
     allowedRoles: ["admin"],
+  },
+  {
+    name: "My Portal",
+    href: "/client-portal",
+    icon: Briefcase,
+    testId: "nav-client-portal",
+    allowedRoles: ["client"],
+  },
+  {
+    name: "My Portal",
+    href: "/freelancer-portal",
+    icon: Clock,
+    testId: "nav-freelancer-portal",
+    allowedRoles: ["freelancer"],
   },
   {
     name: "Settings",
     href: "/settings",
     icon: Settings,
+    testId: "nav-settings",
     allowedRoles: [
       "admin",
       "germany_accountant",
@@ -109,9 +120,9 @@ export function Sidebar() {
             {visibleNav.map((item) => {
               const isActive = location.startsWith(item.href);
               return (
-                <Link key={item.name} href={item.href}>
+                <Link key={item.testId} href={item.href}>
                   <a
-                    data-testid={`nav-${item.name.toLowerCase()}`}
+                    data-testid={item.testId}
                     className={cn(
                       isActive
                         ? "bg-slate-800 text-white"

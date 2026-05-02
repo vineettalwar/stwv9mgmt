@@ -1,3 +1,22 @@
+/**
+ * Seed script — run with: pnpm --filter @workspace/db run seed
+ *
+ * Seeds the 4 STWV company entities (idempotent).
+ *
+ * ADMIN USER SETUP
+ * ─────────────────
+ * There is no hard-coded admin user because the Clerk user ID is only
+ * known after the person signs up. Two ways to bootstrap an admin:
+ *
+ * Option A (recommended): Set the PLATFORM_ADMIN_EMAILS environment variable
+ * in Replit Secrets to a comma-separated list of admin email addresses.
+ *   e.g.  PLATFORM_ADMIN_EMAILS=vineet@stwv.de,admin@stwv.de
+ * Any user who signs up with one of those emails is automatically assigned
+ * the "admin" role via the POST /users self-registration endpoint.
+ *
+ * Option B: After any user signs up, an existing admin can promote them
+ * via PATCH /api/users/:id  { "role": "admin" }.
+ */
 import { db, companiesTable } from "./index";
 
 const companies = [
@@ -8,8 +27,7 @@ const companies = [
     taxRegime: "vat" as const,
     taxNumber: "DE123456789",
     address: "Musterstraße 1, 10115 Berlin, Germany",
-    bankDetails:
-      "IBAN: DE89 3704 0044 0532 0130 00 | BIC: COBADEFFXXX | Commerzbank",
+    bankDetails: "IBAN: DE89 3704 0044 0532 0130 00 | BIC: COBADEFFXXX | Commerzbank",
     currency: "EUR" as const,
     isActive: true,
   },
@@ -42,8 +60,7 @@ const companies = [
     taxRegime: "none" as const,
     taxNumber: null,
     address: "Bandra Kurla Complex, Mumbai 400051, India",
-    bankDetails:
-      "Account: 1122334455 | IFSC: SBIN0003456 | State Bank of India",
+    bankDetails: "Account: 1122334455 | IFSC: SBIN0003456 | State Bank of India",
     currency: "INR" as const,
     isActive: true,
   },
@@ -51,7 +68,6 @@ const companies = [
 
 async function seed() {
   console.log("Seeding database...");
-
   for (const company of companies) {
     const result = await db
       .insert(companiesTable)
@@ -64,8 +80,10 @@ async function seed() {
       console.log(`  Skipped (already exists): ${company.name}`);
     }
   }
-
   console.log("Seed complete.");
+  console.log("");
+  console.log("ADMIN SETUP: Set PLATFORM_ADMIN_EMAILS env var to auto-promote admin users.");
+  console.log("  Example: PLATFORM_ADMIN_EMAILS=vineet@stwv.de,admin@stwv.de");
 }
 
 seed().catch((err) => {

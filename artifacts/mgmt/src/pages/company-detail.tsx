@@ -56,6 +56,7 @@ const editSchema = z.object({
   taxNumber: z.string().optional(),
   address: z.string().optional(),
   bankDetails: z.string().optional(),
+  logoUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   currency: z.enum(["EUR", "INR"]),
   isActive: z.boolean(),
 });
@@ -111,6 +112,7 @@ export default function CompanyDetail() {
       taxNumber: company?.taxNumber ?? "",
       address: company?.address ?? "",
       bankDetails: company?.bankDetails ?? "",
+      logoUrl: company?.logoUrl ?? "",
       currency: (company?.currency as "EUR" | "INR") ?? "INR",
       isActive: company?.isActive ?? true,
     },
@@ -126,6 +128,7 @@ export default function CompanyDetail() {
       taxNumber: company.taxNumber ?? "",
       address: company.address ?? "",
       bankDetails: company.bankDetails ?? "",
+      logoUrl: company.logoUrl ?? "",
       currency: company.currency as "EUR" | "INR",
       isActive: company.isActive,
     });
@@ -143,6 +146,7 @@ export default function CompanyDetail() {
         taxNumber: values.taxNumber || null,
         address: values.address || null,
         bankDetails: values.bankDetails || null,
+        logoUrl: values.logoUrl || null,
         currency: values.currency,
         isActive: values.isActive,
       },
@@ -363,6 +367,19 @@ export default function CompanyDetail() {
                       <FormLabel>Bank Details</FormLabel>
                       <FormControl>
                         <Input data-testid="input-bank-details" placeholder="Account/IBAN, bank name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="logoUrl"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Logo URL</FormLabel>
+                      <FormControl>
+                        <Input data-testid="input-logo-url" placeholder="https://example.com/logo.png" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

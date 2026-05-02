@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
+import { z } from "zod";
 import { db, usersTable, companiesTable, userCompanyAssignmentsTable } from "@workspace/db";
 import {
-  CreateUserBody,
   UpdateUserBody,
   GetUserParams,
   UpdateUserParams,
@@ -17,10 +17,27 @@ import {
   UpdateUserResponse,
   GetUserCompaniesResponse,
 } from "@workspace/api-zod";
-import { requireAuth, requireAdmin, loadDbUser } from "../middlewares/requireRole";
+import { requireAuth, requireAdmin } from "../middlewares/requireRole";
 import { getAuth } from "@clerk/express";
 
 const router: IRouter = Router();
+
+const ROLE_ENUM = z.enum([
+  "admin",
+  "germany_accountant",
+  "india_accountant",
+  "project_manager",
+  "client",
+  "freelancer",
+]);
+
+const SafeUpdateUserBody = z.object({
+  email: z.string().email().optional(),
+  firstName: z.string().nullable().optional(),
+  lastName: z.string().nullable().optional(),
+  role: ROLE_ENUM.optional(),
+  isActive: z.boolean().optional(),
+});
 
 async function getUserWithCompanies(userId: number) {
   const user = await db.select().from(usersTable).where(eq(usersTable.id, userId)).then(r => r[0]);
@@ -40,24 +57,73 @@ router.get("/users", requireAuth, requireAdmin, async (_req, res): Promise<void>
   res.json(ListUsersResponse.parse(usersWithCompanies));
 });
 
-// Self-register (upsert) — any authenticated user
+// Self-register — any authenticated user; clerkUserId derived from token
+// Role is NOT accepted from the client; defaults to "freelancer" unless
+// the email appears in PLATFORM_ADMIN_EMAILS env var.
+// If a pending record (admin pre-created) matches the email, it is linked.
 router.post("/users", requireAuth, async (req, res): Promise<void> => {
-  const parsed = CreateUserBody.safeParse(req.body);
+  const auth = getAuth(req);
+  const clerkId = auth!.userId!;
+
+  // Check if already registered by clerkUserId
+  const existingByClerk = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.clerkUserId, clerkId))
+    .then(r => r[0]);
+  if (existingByClerk) {
+    const full = await getUserWithCompanies(existingByClerk.id);
+    res.status(200).json(GetUserResponse.parse(full));
+    return;
+  }
+
+  // Only accept safe fields from client body
+  const bodySchema = z.object({
+    email: z.string().email(),
+    firstName: z.string().nullable().optional(),
+    lastName: z.string().nullable().optional(),
+  });
+  const parsed = bodySchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const existing = await db
+  const { email, firstName, lastName } = parsed.data;
+
+  // Check for a pending pre-registration by email
+  const pendingByEmail = await db
     .select()
     .from(usersTable)
-    .where(eq(usersTable.clerkUserId, parsed.data.clerkUserId))
+    .where(eq(usersTable.email, email))
     .then(r => r[0]);
-  if (existing) {
-    const updated = await getUserWithCompanies(existing.id);
-    res.status(201).json(GetUserResponse.parse(updated));
+  if (pendingByEmail && pendingByEmail.clerkUserId.startsWith("pending:")) {
+    // Link this Clerk account to the pre-registered record
+    const [linked] = await db
+      .update(usersTable)
+      .set({
+        clerkUserId: clerkId,
+        firstName: firstName ?? pendingByEmail.firstName,
+        lastName: lastName ?? pendingByEmail.lastName,
+        updatedAt: new Date(),
+      })
+      .where(eq(usersTable.id, pendingByEmail.id))
+      .returning();
+    const full = await getUserWithCompanies(linked.id);
+    res.status(201).json(GetUserResponse.parse(full));
     return;
   }
-  const [user] = await db.insert(usersTable).values(parsed.data).returning();
+
+  // Determine role from PLATFORM_ADMIN_EMAILS env var; default to "freelancer"
+  const adminEmails = (process.env.PLATFORM_ADMIN_EMAILS ?? "")
+    .split(",")
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
+  const role = adminEmails.includes(email.toLowerCase()) ? "admin" : "freelancer";
+
+  const [user] = await db
+    .insert(usersTable)
+    .values({ clerkUserId: clerkId, email, firstName: firstName ?? null, lastName: lastName ?? null, role, isActive: true })
+    .returning();
   const full = await getUserWithCompanies(user.id);
   res.status(201).json(GetUserResponse.parse(full));
 });
@@ -66,70 +132,40 @@ router.post("/users", requireAuth, async (req, res): Promise<void> => {
 router.get("/users/me", requireAuth, async (req, res): Promise<void> => {
   const auth = getAuth(req);
   const clerkId = auth?.userId;
-  if (!clerkId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  const user = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.clerkUserId, clerkId))
-    .then(r => r[0]);
-  if (!user) {
-    res.status(404).json({ error: "User not found" });
-    return;
-  }
+  if (!clerkId) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const user = await db.select().from(usersTable).where(eq(usersTable.clerkUserId, clerkId)).then(r => r[0]);
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
   const full = await getUserWithCompanies(user.id);
   res.json(GetMeResponse.parse(full));
 });
 
-// Get specific user — admin only (or self)
+// Get specific user — admin or self only
 router.get("/users/:id", requireAuth, async (req, res): Promise<void> => {
   const params = GetUserParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-  // Allow self-access or admin
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
   const auth = getAuth(req);
-  const self = await db.select().from(usersTable)
-    .where(eq(usersTable.clerkUserId, auth?.userId ?? ""))
-    .then(r => r[0]);
-  const isSelf = self?.id === params.data.id;
-  const isAdmin = self?.role === "admin";
-  if (!isSelf && !isAdmin) {
-    res.status(403).json({ error: "Forbidden" });
-    return;
+  const self = await db.select().from(usersTable).where(eq(usersTable.clerkUserId, auth?.userId ?? "")).then(r => r[0]);
+  if (!self || (self.id !== params.data.id && self.role !== "admin")) {
+    res.status(403).json({ error: "Forbidden" }); return;
   }
   const user = await getUserWithCompanies(params.data.id);
-  if (!user) {
-    res.status(404).json({ error: "User not found" });
-    return;
-  }
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
   res.json(GetUserResponse.parse(user));
 });
 
-// Update user — admin only
+// Update user — admin only; role validated as enum
 router.patch("/users/:id", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const params = UpdateUserParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-  const parsed = UpdateUserBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
-  const [user] = await db
-    .update(usersTable)
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+
+  const parsed = SafeUpdateUserBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+
+  const [user] = await db.update(usersTable)
     .set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(usersTable.id, params.data.id))
     .returning();
-  if (!user) {
-    res.status(404).json({ error: "User not found" });
-    return;
-  }
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
   const full = await getUserWithCompanies(user.id);
   res.json(UpdateUserResponse.parse(full));
 });
@@ -137,10 +173,7 @@ router.patch("/users/:id", requireAuth, requireAdmin, async (req, res): Promise<
 // Delete user — admin only
 router.delete("/users/:id", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const params = DeleteUserParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
   await db.delete(usersTable).where(eq(usersTable.id, params.data.id));
   res.sendStatus(204);
 });
@@ -148,19 +181,11 @@ router.delete("/users/:id", requireAuth, requireAdmin, async (req, res): Promise
 // Get user's company assignments — admin or self
 router.get("/users/:id/companies", requireAuth, async (req, res): Promise<void> => {
   const params = GetUserCompaniesParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
   const auth = getAuth(req);
-  const self = await db.select().from(usersTable)
-    .where(eq(usersTable.clerkUserId, auth?.userId ?? ""))
-    .then(r => r[0]);
-  const isSelf = self?.id === params.data.id;
-  const isAdmin = self?.role === "admin";
-  if (!isSelf && !isAdmin) {
-    res.status(403).json({ error: "Forbidden" });
-    return;
+  const self = await db.select().from(usersTable).where(eq(usersTable.clerkUserId, auth?.userId ?? "")).then(r => r[0]);
+  if (!self || (self.id !== params.data.id && self.role !== "admin")) {
+    res.status(403).json({ error: "Forbidden" }); return;
   }
   const assignments = await db
     .select({
@@ -179,70 +204,32 @@ router.get("/users/:id/companies", requireAuth, async (req, res): Promise<void> 
 // Assign company — admin only
 router.post("/users/:id/companies", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const params = AssignUserToCompanyParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
   const parsed = AssignUserToCompanyBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const [assignment] = await db
     .insert(userCompanyAssignmentsTable)
     .values({ userId: params.data.id, companyId: parsed.data.companyId })
     .onConflictDoNothing()
     .returning();
-  if (!assignment) {
-    const existing = await db
-      .select({
-        id: userCompanyAssignmentsTable.id,
-        userId: userCompanyAssignmentsTable.userId,
-        companyId: userCompanyAssignmentsTable.companyId,
-        createdAt: userCompanyAssignmentsTable.createdAt,
-        company: companiesTable,
-      })
-      .from(userCompanyAssignmentsTable)
-      .innerJoin(companiesTable, eq(userCompanyAssignmentsTable.companyId, companiesTable.id))
-      .where(
-        and(
-          eq(userCompanyAssignmentsTable.userId, params.data.id),
-          eq(userCompanyAssignmentsTable.companyId, parsed.data.companyId),
-        ),
-      )
-      .then(r => r[0]);
-    res.status(201).json(existing);
-    return;
-  }
+  const existingOrNew = assignment
+    ? assignment
+    : await db.select().from(userCompanyAssignmentsTable)
+        .where(and(eq(userCompanyAssignmentsTable.userId, params.data.id), eq(userCompanyAssignmentsTable.companyId, parsed.data.companyId)))
+        .then(r => r[0]);
   const [withCompany] = await db
-    .select({
-      id: userCompanyAssignmentsTable.id,
-      userId: userCompanyAssignmentsTable.userId,
-      companyId: userCompanyAssignmentsTable.companyId,
-      createdAt: userCompanyAssignmentsTable.createdAt,
-      company: companiesTable,
-    })
+    .select({ id: userCompanyAssignmentsTable.id, userId: userCompanyAssignmentsTable.userId, companyId: userCompanyAssignmentsTable.companyId, createdAt: userCompanyAssignmentsTable.createdAt, company: companiesTable })
     .from(userCompanyAssignmentsTable)
     .innerJoin(companiesTable, eq(userCompanyAssignmentsTable.companyId, companiesTable.id))
-    .where(eq(userCompanyAssignmentsTable.id, assignment.id));
+    .where(eq(userCompanyAssignmentsTable.id, existingOrNew!.id));
   res.status(201).json(withCompany);
 });
 
 // Remove company assignment — admin only
 router.delete("/users/:id/companies/:companyId", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const params = RemoveUserFromCompanyParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-  await db
-    .delete(userCompanyAssignmentsTable)
-    .where(
-      and(
-        eq(userCompanyAssignmentsTable.userId, params.data.id),
-        eq(userCompanyAssignmentsTable.companyId, params.data.companyId),
-      ),
-    );
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+  await db.delete(userCompanyAssignmentsTable).where(and(eq(userCompanyAssignmentsTable.userId, params.data.id), eq(userCompanyAssignmentsTable.companyId, params.data.companyId)));
   res.sendStatus(204);
 });
 

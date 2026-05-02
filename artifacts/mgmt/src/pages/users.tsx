@@ -1,11 +1,41 @@
+import { useState } from "react";
 import { useListUsers } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users as UsersIcon, ChevronRight } from "lucide-react";
+import { Users as UsersIcon, ChevronRight, UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { getListUsersQueryKey } from "@workspace/api-client-react";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useAuth } from "@clerk/react";
 
 const ROLE_STYLES: Record<string, { label: string; className: string }> = {
   admin: { label: "Admin", className: "bg-violet-100 text-violet-800 hover:bg-violet-100" },
@@ -25,7 +55,164 @@ export function RoleBadge({ role }: { role: string }) {
   );
 }
 
+const createUserSchema = z.object({
+  email: z.string().email("Valid email required"),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  role: z.enum([
+    "admin",
+    "germany_accountant",
+    "india_accountant",
+    "project_manager",
+    "client",
+    "freelancer",
+  ]),
+});
+
+type CreateUserValues = z.infer<typeof createUserSchema>;
+
+function CreateUserDialog({ onCreated }: { onCreated: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+  const { getToken } = useAuth();
+
+  const form = useForm<CreateUserValues>({
+    resolver: zodResolver(createUserSchema),
+    defaultValues: { email: "", firstName: "", lastName: "", role: "freelancer" },
+  });
+
+  async function onSubmit(values: CreateUserValues) {
+    setLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          email: values.email,
+          firstName: values.firstName || null,
+          lastName: values.lastName || null,
+          role: values.role,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(err.error ?? "Failed to create user");
+      }
+      toast({ title: "User pre-registered", description: `${values.email} will be assigned ${values.role} role on first sign-in.` });
+      form.reset();
+      setOpen(false);
+      onCreated();
+    } catch (err: unknown) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Failed to create user", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" data-testid="button-create-user">
+          <UserPlus className="h-4 w-4 mr-2" /> Create User
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Pre-register a User</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-slate-500">
+          Enter the user's email and role. They will be assigned this role automatically when they sign in.
+        </p>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-2">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email *</FormLabel>
+                  <FormControl>
+                    <Input data-testid="input-create-user-email" placeholder="user@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <FormField
+                control={form.control}
+                name="firstName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name</FormLabel>
+                    <FormControl>
+                      <Input data-testid="input-create-user-firstname" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl>
+                      <Input data-testid="input-create-user-lastname" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Role *</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-create-user-role">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="germany_accountant">DE Accountant</SelectItem>
+                      <SelectItem value="india_accountant">IN Accountant</SelectItem>
+                      <SelectItem value="project_manager">Project Manager</SelectItem>
+                      <SelectItem value="client">Client</SelectItem>
+                      <SelectItem value="freelancer">Freelancer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading} data-testid="button-submit-create-user">
+                {loading ? "Creating..." : "Create User"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Users() {
+  const queryClient = useQueryClient();
   const { data: users, isLoading, isError } = useListUsers();
   const [search, setSearch] = useState("");
 
@@ -47,6 +234,7 @@ export default function Users() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Users</h1>
           <p className="text-sm text-slate-500">All platform users and their roles.</p>
         </div>
+        <CreateUserDialog onCreated={() => queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() })} />
       </div>
 
       <div className="max-w-sm">
@@ -75,7 +263,7 @@ export default function Users() {
             {search ? "No users match your search" : "No users yet"}
           </h3>
           <p className="mt-1 text-sm text-slate-500">
-            {search ? "Try a different search term." : "Users will appear here once they sign in."}
+            {search ? "Try a different search term." : "Use the Create User button above to pre-register users, or they will appear here once they sign in."}
           </p>
         </div>
       ) : (
@@ -102,6 +290,11 @@ export default function Users() {
                               Inactive
                             </Badge>
                           )}
+                          {user.clerkUserId?.startsWith("pending:") && (
+                            <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">
+                              Pending sign-in
+                            </Badge>
+                          )}
                         </div>
                         <div className="text-sm text-slate-500">{user.email}</div>
                       </div>
@@ -110,12 +303,7 @@ export default function Users() {
                       {user.companies && user.companies.length > 0 && (
                         <div className="hidden sm:flex flex-wrap gap-1 max-w-xs justify-end">
                           {user.companies.slice(0, 2).map((c) => (
-                            <Badge
-                              key={c.id}
-                              variant="outline"
-                              className="text-xs text-slate-600"
-                              data-testid={`badge-company-${c.id}-user-${user.id}`}
-                            >
+                            <Badge key={c.id} variant="outline" className="text-xs text-slate-600" data-testid={`badge-company-${c.id}-user-${user.id}`}>
                               {c.name}
                             </Badge>
                           ))}

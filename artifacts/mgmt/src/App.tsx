@@ -16,6 +16,8 @@ import UserDetail from "@/pages/user-detail";
 import Settings from "@/pages/settings";
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
+import ClientPortal from "@/pages/client-portal";
+import FreelancerPortal from "@/pages/freelancer-portal";
 
 const queryClient = new QueryClient();
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -31,9 +33,7 @@ type UserRole =
 function ApiTokenBridge() {
   const { getToken } = useAuth();
   useEffect(() => {
-    setAuthTokenGetter(async () => {
-      return await getToken();
-    });
+    setAuthTokenGetter(async () => await getToken());
   }, [getToken]);
   return null;
 }
@@ -76,7 +76,10 @@ function PrivateRoute({
   if (allowedRoles && !meLoading && me) {
     const userRole = me.role as UserRole;
     if (!allowedRoles.includes(userRole)) {
-      return <Redirect to="/dashboard" replace />;
+      // Redirect client/freelancer to their portals; others to settings
+      if (userRole === "client") return <Redirect to="/client-portal" replace />;
+      if (userRole === "freelancer") return <Redirect to="/freelancer-portal" replace />;
+      return <Redirect to="/settings" replace />;
     }
   }
 
@@ -87,12 +90,25 @@ function PrivateRoute({
   );
 }
 
-function RedirectToDashboard() {
+function SmartRedirect() {
+  const { isSignedIn, isLoaded } = useAuth();
+  const { data: me, isLoading: meLoading } = useGetMe();
   const [, setLocation] = useLocation();
+
   useEffect(() => {
-    setLocation("/dashboard", { replace: true });
-  }, [setLocation]);
-  return null;
+    if (!isLoaded || meLoading) return;
+    if (!isSignedIn) { setLocation("/sign-in", { replace: true }); return; }
+    const role = me?.role as UserRole | undefined;
+    if (role === "client") setLocation("/client-portal", { replace: true });
+    else if (role === "freelancer") setLocation("/freelancer-portal", { replace: true });
+    else setLocation("/dashboard", { replace: true });
+  }, [isLoaded, isSignedIn, me, meLoading, setLocation]);
+
+  return (
+    <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400 text-sm">
+      Loading...
+    </div>
+  );
 }
 
 const ADMIN_ONLY: UserRole[] = ["admin"];
@@ -102,6 +118,8 @@ const STAFF_ROLES: UserRole[] = [
   "india_accountant",
   "project_manager",
 ];
+const CLIENT_ONLY: UserRole[] = ["client"];
+const FREELANCER_ONLY: UserRole[] = ["freelancer"];
 const ALL_ROLES: UserRole[] = [
   "admin",
   "germany_accountant",
@@ -116,43 +134,15 @@ function Router() {
     <Switch>
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/sign-up" component={SignUpPage} />
-      <Route path="/" component={RedirectToDashboard} />
-      <Route
-        path="/dashboard"
-        component={() => (
-          <PrivateRoute component={Dashboard} allowedRoles={STAFF_ROLES} />
-        )}
-      />
-      <Route
-        path="/companies"
-        component={() => (
-          <PrivateRoute component={Companies} allowedRoles={STAFF_ROLES} />
-        )}
-      />
-      <Route
-        path="/companies/:id"
-        component={() => (
-          <PrivateRoute component={CompanyDetail} allowedRoles={STAFF_ROLES} />
-        )}
-      />
-      <Route
-        path="/users"
-        component={() => (
-          <PrivateRoute component={Users} allowedRoles={ADMIN_ONLY} />
-        )}
-      />
-      <Route
-        path="/users/:id"
-        component={() => (
-          <PrivateRoute component={UserDetail} allowedRoles={ADMIN_ONLY} />
-        )}
-      />
-      <Route
-        path="/settings"
-        component={() => (
-          <PrivateRoute component={Settings} allowedRoles={ALL_ROLES} />
-        )}
-      />
+      <Route path="/" component={SmartRedirect} />
+      <Route path="/dashboard" component={() => <PrivateRoute component={Dashboard} allowedRoles={STAFF_ROLES} />} />
+      <Route path="/companies" component={() => <PrivateRoute component={Companies} allowedRoles={STAFF_ROLES} />} />
+      <Route path="/companies/:id" component={() => <PrivateRoute component={CompanyDetail} allowedRoles={STAFF_ROLES} />} />
+      <Route path="/users" component={() => <PrivateRoute component={Users} allowedRoles={ADMIN_ONLY} />} />
+      <Route path="/users/:id" component={() => <PrivateRoute component={UserDetail} allowedRoles={ADMIN_ONLY} />} />
+      <Route path="/client-portal" component={() => <PrivateRoute component={ClientPortal} allowedRoles={CLIENT_ONLY} />} />
+      <Route path="/freelancer-portal" component={() => <PrivateRoute component={FreelancerPortal} allowedRoles={FREELANCER_ONLY} />} />
+      <Route path="/settings" component={() => <PrivateRoute component={Settings} allowedRoles={ALL_ROLES} />} />
       <Route component={NotFound} />
     </Switch>
   );
