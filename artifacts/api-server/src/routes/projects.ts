@@ -16,6 +16,8 @@ const router: IRouter = Router();
 
 const PROJECT_TYPES = ["one_time", "monthly_fixed", "amc", "internal"] as const;
 const PROJECT_STATUSES = ["active", "completed", "on_hold", "archived"] as const;
+// Statuses settable via create/update payloads; `archived` is reserved for the archive flow only.
+const SETTABLE_PROJECT_STATUSES = ["active", "completed", "on_hold"] as const;
 const BILLING_MODELS = ["hourly", "fixed", "retainer"] as const;
 
 const CreateProjectBody = z.object({
@@ -24,7 +26,7 @@ const CreateProjectBody = z.object({
   companyId: z.number().int(),
   clientId: z.number().int().nullable().optional(),
   description: z.string().nullable().optional(),
-  status: z.enum(PROJECT_STATUSES).optional(),
+  status: z.enum(SETTABLE_PROJECT_STATUSES).optional(),
   billingModel: z.enum(BILLING_MODELS),
   fixedAllocationHours: z.string().nullable().optional(),
   startDate: z.string().nullable().optional(),
@@ -37,7 +39,7 @@ const UpdateProjectBody = z.object({
   companyId: z.number().int().optional(),
   clientId: z.number().int().nullable().optional(),
   description: z.string().nullable().optional(),
-  status: z.enum(PROJECT_STATUSES).optional(),
+  status: z.enum(SETTABLE_PROJECT_STATUSES).optional(),
   billingModel: z.enum(BILLING_MODELS).optional(),
   fixedAllocationHours: z.string().nullable().optional(),
   startDate: z.string().nullable().optional(),

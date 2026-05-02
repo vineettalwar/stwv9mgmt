@@ -69,7 +69,7 @@ const createProjectSchema = z.object({
   companyId: z.number({ required_error: "Company is required" }),
   clientId: z.number().nullable().optional(),
   billingModel: z.enum(["hourly", "fixed", "retainer"]),
-  status: z.enum(["active", "completed", "on_hold", "archived"]).default("active"),
+  status: z.enum(["active", "completed", "on_hold"]).default("active"),
   description: z.string().nullable().optional(),
   fixedAllocationHours: z.string().nullable().optional(),
   startDate: z.string().nullable().optional(),
