@@ -35,7 +35,44 @@ app.use(
 
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
-app.use(cors({ credentials: true, origin: true }));
+// CORS: explicit allowlist only — never reflect arbitrary origins with credentials.
+// Origins are the Replit dev domain and any explicitly configured FRONTEND_URL.
+const buildAllowedOrigins = (): Set<string> => {
+  const origins = new Set<string>();
+
+  const frontendUrl = process.env.FRONTEND_URL?.trim();
+  if (frontendUrl) origins.add(frontendUrl.replace(/\/$/, ""));
+
+  const devDomain = process.env.REPLIT_DEV_DOMAIN?.trim();
+  if (devDomain) {
+    origins.add(`https://${devDomain}`);
+    // mgmt artifact is mounted under the same dev domain
+    origins.add(`https://${devDomain}/mgmt`);
+  }
+
+  // Vite dev server (local development)
+  origins.add("http://localhost:5173");
+  origins.add("http://localhost:5174");
+
+  return origins;
+};
+
+const allowedOrigins = buildAllowedOrigins();
+
+app.use(
+  cors({
+    credentials: true,
+    origin: (origin, callback) => {
+      // Allow server-to-server requests (no Origin header)
+      if (!origin) { callback(null, true); return; }
+      if (allowedOrigins.has(origin)) { callback(null, true); return; }
+      // Allow any replit.dev subdomain (proxied preview pane requests)
+      if (/^https:\/\/[a-z0-9-]+\.replit\.dev$/.test(origin)) { callback(null, true); return; }
+      callback(new Error(`CORS: origin not allowed — ${origin}`));
+    },
+  }),
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

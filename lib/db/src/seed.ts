@@ -1,7 +1,10 @@
 /**
  * Seed script — run with: pnpm --filter @workspace/db run seed
  *
- * Seeds the 4 STWV company entities (idempotent).
+ * Seeds:
+ *   1. user_roles reference table (6 platform roles)
+ *   2. companies (4 STWV entities — idempotent via unique name constraint)
+ *   3. Default admin user (optional — requires env vars, see below)
  *
  * ADMIN USER BOOTSTRAP
  * ─────────────────────
@@ -10,14 +13,15 @@
  *   PLATFORM_ADMIN_CLERK_ID=user_2abc123...   (from Clerk Dashboard → Users)
  *   PLATFORM_ADMIN_EMAIL=vineet@stwv.de
  *
- * When both are set, this script inserts an admin user record.
- * This record is linked when the admin signs in via Clerk (matching by clerkUserId).
+ * When both are set, this script inserts an admin user record linked to
+ * that Clerk account. Idempotent — safe to run multiple times.
  *
  * Alternatively, set PLATFORM_ADMIN_EMAILS=email1,email2 as a Replit Secret.
- * Any user whose Clerk-verified email matches that list is auto-promoted to admin
- * on first sign-in — no seed required.
+ * Any user whose Clerk-verified email matches that list is auto-promoted to
+ * admin on first sign-in via GET /api/users/me (no seed required).
  */
-import { db, companiesTable, usersTable } from "./index";
+import { db, companiesTable, usersTable, userRolesTable } from "./index";
+import { ROLE_DISPLAY_NAMES, PLATFORM_ROLES } from "./schema/userRoles";
 
 const companies = [
   {
@@ -67,28 +71,46 @@ const companies = [
 ];
 
 async function seed() {
-  console.log("Seeding database...");
+  console.log("Seeding database…\n");
 
-  // ── Companies ──
+  // ── 1. User Roles reference table ──────────────────────────────────────────
+  console.log("1. Seeding user_roles reference table…");
+  for (const role of PLATFORM_ROLES) {
+    const { displayName, description } = ROLE_DISPLAY_NAMES[role];
+    const result = await db
+      .insert(userRolesTable)
+      .values({ role, displayName, description })
+      .onConflictDoNothing()
+      .returning({ role: userRolesTable.role });
+    if (result.length > 0) {
+      console.log(`   Inserted role: ${role} ("${displayName}")`);
+    } else {
+      console.log(`   Skipped (exists): ${role}`);
+    }
+  }
+
+  // ── 2. Companies ───────────────────────────────────────────────────────────
+  console.log("\n2. Seeding companies…");
   for (const company of companies) {
+    // Conflict target: companies_name_unique (unique constraint on name column)
     const result = await db
       .insert(companiesTable)
       .values(company)
       .onConflictDoNothing()
       .returning({ id: companiesTable.id, name: companiesTable.name });
     if (result.length > 0) {
-      console.log(`  Inserted company: ${company.name} (id=${result[0].id})`);
+      console.log(`   Inserted: ${company.name} (id=${result[0].id})`);
     } else {
-      console.log(`  Skipped (already exists): ${company.name}`);
+      console.log(`   Skipped (exists): ${company.name}`);
     }
   }
 
-  // ── Default admin user ──
+  // ── 3. Default admin user (optional) ──────────────────────────────────────
+  console.log("\n3. Default admin user…");
   const adminClerkId = process.env.PLATFORM_ADMIN_CLERK_ID?.trim();
   const adminEmail = process.env.PLATFORM_ADMIN_EMAIL?.trim();
 
   if (adminClerkId && adminEmail) {
-    console.log(`\nSeeding default admin: ${adminEmail} (${adminClerkId})`);
     const result = await db
       .insert(usersTable)
       .values({
@@ -102,13 +124,13 @@ async function seed() {
       .onConflictDoNothing()
       .returning({ id: usersTable.id, email: usersTable.email });
     if (result.length > 0) {
-      console.log(`  Inserted admin user: ${adminEmail} (id=${result[0].id})`);
+      console.log(`   Inserted admin: ${adminEmail} (id=${result[0].id})`);
     } else {
-      console.log(`  Skipped (already exists): ${adminEmail}`);
+      console.log(`   Skipped (exists): ${adminEmail}`);
     }
   } else {
-    console.log("\nAdmin user not seeded — set PLATFORM_ADMIN_CLERK_ID and PLATFORM_ADMIN_EMAIL to seed one.");
-    console.log("  Alternative: set PLATFORM_ADMIN_EMAILS=email1,email2 (auto-promotes on first sign-in).");
+    console.log("   Skipped — set PLATFORM_ADMIN_CLERK_ID + PLATFORM_ADMIN_EMAIL to seed an admin.");
+    console.log("   Alternative: set PLATFORM_ADMIN_EMAILS secret to auto-promote on first sign-in.");
   }
 
   console.log("\nSeed complete.");

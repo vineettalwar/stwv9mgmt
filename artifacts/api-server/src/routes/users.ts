@@ -159,7 +159,9 @@ router.get("/users/:id", requireAuth, async (req, res): Promise<void> => {
   res.json(GetUserResponse.parse(user));
 });
 
-// Update user — admin only; role validated as enum
+// Update user — admin only; role validated as enum.
+// When role changes, it is also synced to Clerk publicMetadata so Clerk
+// acts as a secondary source of truth alongside the platform DB.
 router.patch("/users/:id", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const params = UpdateUserParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
@@ -170,6 +172,19 @@ router.patch("/users/:id", requireAuth, requireAdmin, async (req, res): Promise<
     .where(eq(usersTable.id, params.data.id))
     .returning();
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  // Sync role to Clerk publicMetadata if the Clerk account is active (not a pending placeholder)
+  if (parsed.data.role && !user.clerkUserId.startsWith("pending:")) {
+    try {
+      const clerkUser = await clerkClient.users.getUser(user.clerkUserId);
+      await clerkClient.users.updateUser(user.clerkUserId, {
+        publicMetadata: { ...(clerkUser.publicMetadata ?? {}), role: user.role },
+      });
+    } catch {
+      // Non-fatal: DB is the primary source of truth; Clerk sync is best-effort
+    }
+  }
+
   const full = await getUserWithCompanies(user.id);
   res.json(UpdateUserResponse.parse(full));
 });
