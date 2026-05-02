@@ -1926,6 +1926,154 @@ paths:
                 items:
                   $ref: "#/components/schemas/AuditLog"
 
+  # ───── EXPENSES ─────
+  /projects/{id}/expenses:
+    get:
+      operationId: listProjectExpenses
+      tags: [expenses]
+      summary: List expenses for a project
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: List of expenses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Expense"
+    post:
+      operationId: createProjectExpense
+      tags: [expenses]
+      summary: Log an expense against a project
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExpenseBody"
+      responses:
+        "201":
+          description: Expense created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Expense"
+
+  /projects/{id}/expenses/unbilled:
+    get:
+      operationId: listUnbilledExpenses
+      tags: [expenses]
+      summary: List unbilled billable expenses for a project
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Unbilled billable expenses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Expense"
+
+  /projects/{id}/expenses/mark-invoiced:
+    post:
+      operationId: markExpensesInvoiced
+      tags: [expenses]
+      summary: Mark a list of expense IDs as invoiced
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expenseIds]
+              properties:
+                expenseIds:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        "200":
+          description: Expenses marked as invoiced
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  count:
+                    type: integer
+
+  /projects/{id}/expenses/{expenseId}:
+    patch:
+      operationId: updateProjectExpense
+      tags: [expenses]
+      summary: Update an expense
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: expenseId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExpenseBody"
+      responses:
+        "200":
+          description: Updated expense
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Expense"
+    delete:
+      operationId: deleteProjectExpense
+      tags: [expenses]
+      summary: Delete an expense (only if not yet invoiced)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: expenseId
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Expense deleted
+
   # ───── ADMIN DASHBOARD ─────
   /dashboard/admin-stats:
     get:
@@ -3794,6 +3942,72 @@ components:
           type: ["string", "null"]
         lastName:
           type: ["string", "null"]
+
+    Expense:
+      type: object
+      required:
+        - id
+        - projectId
+        - amount
+        - currency
+        - category
+        - description
+        - date
+        - isBillable
+        - createdAt
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        createdBy:
+          type: ["integer", "null"]
+        amount:
+          type: string
+        currency:
+          type: string
+        category:
+          type: string
+          enum: [travel, software, hardware, other]
+        description:
+          type: string
+        date:
+          type: string
+        isBillable:
+          type: boolean
+        invoicedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        creatorEmail:
+          type: ["string", "null"]
+        creatorFirstName:
+          type: ["string", "null"]
+        creatorLastName:
+          type: ["string", "null"]
+
+    CreateExpenseBody:
+      type: object
+      required:
+        - amount
+        - description
+        - date
+      properties:
+        amount:
+          type: string
+        currency:
+          type: string
+        category:
+          type: string
+          enum: [travel, software, hardware, other]
+        description:
+          type: string
+        date:
+          type: string
+        isBillable:
+          type: boolean
 
     AuditLog:
       type: object

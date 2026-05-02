@@ -18,6 +18,7 @@ import complianceRouter from "./compliance";
 import adminDashboardRouter from "./adminDashboard";
 import auditLogsRouter from "./auditLogs";
 import reportsRouter from "./reports";
+import expensesRouter from "./expenses";
 
 const router: IRouter = Router();
 
@@ -40,5 +41,6 @@ router.use(notificationsRouter);
 router.use(complianceRouter);
 router.use(auditLogsRouter);
 router.use(reportsRouter);
+router.use(expensesRouter);
 
 export default router;

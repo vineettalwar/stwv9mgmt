@@ -17,6 +17,10 @@ import {
   useListProjectTimeEntries,
   useGetProjectBillingSummary,
   useListUsers,
+  useListProjectExpenses,
+  useCreateProjectExpense,
+  useUpdateProjectExpense,
+  useDeleteProjectExpense,
   getGetProjectQueryKey,
   getListProjectAssignmentsQueryKey,
   getListDeliverablesQueryKey,
@@ -24,7 +28,7 @@ import {
   getListProjectTimeEntriesQueryKey,
   getGetProjectBillingSummaryQueryKey,
 } from "@workspace/api-client-react";
-import type { Project } from "@workspace/api-client-react";
+import type { Project, Expense } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGetMe } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,6 +50,8 @@ import {
   BarChart2,
   Flag,
   Activity,
+  DollarSign,
+  Receipt,
 } from "lucide-react";
 import {
   Dialog,
@@ -146,7 +152,7 @@ const DELIVERABLE_STATUS_COLUMNS = [
   { key: "done", label: "Done", icon: CheckCircle2, color: "text-emerald-500" },
 ] as const;
 
-type Tab = "overview" | "deliverables" | "milestones" | "time" | "billing" | "activity";
+type Tab = "overview" | "deliverables" | "milestones" | "time" | "billing" | "expenses" | "activity";
 
 function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
@@ -663,6 +669,250 @@ function BillingTab({ projectId, projectType }: { projectId: number; projectType
   );
 }
 
+// ─── Expenses Tab ─────────────────────────────────────────────────────────────
+
+const CATEGORY_LABELS: Record<string, string> = {
+  travel: "Travel",
+  software: "Software",
+  hardware: "Hardware",
+  other: "Other",
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+  travel: "bg-blue-100 text-blue-700",
+  software: "bg-purple-100 text-purple-700",
+  hardware: "bg-amber-100 text-amber-700",
+  other: "bg-slate-100 text-slate-600",
+};
+
+const expenseSchema = z.object({
+  amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Must be a positive number (e.g. 12.50)"),
+  currency: z.string().min(1).max(10).default("EUR"),
+  category: z.enum(["travel", "software", "hardware", "other"]).default("other"),
+  description: z.string().min(1, "Description required"),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date required"),
+  isBillable: z.boolean().default(false),
+});
+
+function ExpensesTab({ projectId, canEdit }: { projectId: number; canEdit: boolean }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+
+  const { data: expenses, isLoading } = useListProjectExpenses(projectId);
+
+  const { mutate: create, isPending: creating } = useCreateProjectExpense({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["listProjectExpenses", projectId] });
+        toast({ title: "Expense logged" });
+        form.reset({ currency: "EUR", category: "other", isBillable: false, date: new Date().toISOString().slice(0, 10), amount: "", description: "" });
+        setOpen(false);
+      },
+      onError: () => toast({ title: "Failed to log expense", variant: "destructive" }),
+    },
+  });
+
+  const { mutate: deleteExpense } = useDeleteProjectExpense({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["listProjectExpenses", projectId] });
+        toast({ title: "Expense deleted" });
+      },
+      onError: () => toast({ title: "Cannot delete this expense", variant: "destructive" }),
+    },
+  });
+
+  const { mutate: toggleBillable } = useUpdateProjectExpense({
+    mutation: {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["listProjectExpenses", projectId] }),
+      onError: () => toast({ title: "Update failed", variant: "destructive" }),
+    },
+  });
+
+  const form = useForm<z.infer<typeof expenseSchema>>({
+    resolver: zodResolver(expenseSchema),
+    defaultValues: {
+      currency: "EUR",
+      category: "other",
+      isBillable: false,
+      date: new Date().toISOString().slice(0, 10),
+      amount: "",
+      description: "",
+    },
+  });
+
+  if (isLoading) return <Skeleton className="h-40 w-full" />;
+
+  const list = (expenses ?? []) as (Expense & { creatorEmail?: string | null; creatorFirstName?: string | null; creatorLastName?: string | null })[];
+  const billableTotal = list.filter(e => e.isBillable).reduce((s, e) => s + parseFloat(e.amount), 0);
+  const internalTotal = list.filter(e => !e.isBillable).reduce((s, e) => s + parseFloat(e.amount), 0);
+  const unbilledCount = list.filter(e => e.isBillable && !e.invoicedAt).length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-4 text-sm">
+          <span className="text-slate-500">Billable: <span className="font-semibold text-slate-900">{billableTotal.toFixed(2)}</span></span>
+          <span className="text-slate-500">Internal: <span className="font-semibold text-slate-900">{internalTotal.toFixed(2)}</span></span>
+          {unbilledCount > 0 && (
+            <span className="text-amber-600 font-medium">{unbilledCount} unbilled</span>
+          )}
+        </div>
+        {canEdit && (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" data-testid="button-add-expense">
+                <Plus className="h-4 w-4 mr-2" /> Log Expense
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader><DialogTitle>Log Expense</DialogTitle></DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(v => create({ id: projectId, data: v }))} className="space-y-3 mt-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField control={form.control} name="amount" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Amount *</FormLabel>
+                        <FormControl><Input placeholder="0.00" {...field} data-testid="input-expense-amount" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="currency" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Currency</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            <SelectItem value="EUR">EUR</SelectItem>
+                            <SelectItem value="INR">INR</SelectItem>
+                            <SelectItem value="USD">USD</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )} />
+                  </div>
+                  <FormField control={form.control} name="description" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description *</FormLabel>
+                      <FormControl><Input placeholder="What was this expense for?" {...field} data-testid="input-expense-description" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField control={form.control} name="category" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            <SelectItem value="travel">Travel</SelectItem>
+                            <SelectItem value="software">Software</SelectItem>
+                            <SelectItem value="hardware">Hardware</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="date" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Date *</FormLabel>
+                        <FormControl><Input type="date" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                  <FormField control={form.control} name="isBillable" render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="isBillable"
+                          checked={field.value}
+                          onChange={e => field.onChange(e.target.checked)}
+                          className="rounded"
+                        />
+                        <label htmlFor="isBillable" className="text-sm text-slate-700">Billable to client</label>
+                      </div>
+                    </FormItem>
+                  )} />
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                    <Button type="submit" disabled={creating}>Log Expense</Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+
+      {list.length === 0 ? (
+        <div className="text-center py-12 text-sm text-slate-400">
+          <DollarSign className="mx-auto h-10 w-10 text-slate-200 mb-2" />
+          No expenses logged yet.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {[...list].sort((a, b) => b.date.localeCompare(a.date)).map(expense => {
+            const catColor = CATEGORY_COLORS[expense.category] ?? "bg-slate-100 text-slate-600";
+            const creator = expense.creatorFirstName || expense.creatorLastName
+              ? `${expense.creatorFirstName ?? ""} ${expense.creatorLastName ?? ""}`.trim()
+              : expense.creatorEmail ?? null;
+            return (
+              <div key={expense.id} className="flex items-center gap-3 p-3 border border-slate-100 rounded-md bg-white group text-sm">
+                <div className="flex-shrink-0">
+                  <Receipt className="h-4 w-4 text-slate-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-slate-900">{expense.currency} {parseFloat(expense.amount).toFixed(2)}</span>
+                    <Badge className={`text-xs ${catColor}`}>{CATEGORY_LABELS[expense.category] ?? expense.category}</Badge>
+                    {expense.isBillable && (
+                      <Badge className="text-xs bg-emerald-100 text-emerald-700">
+                        {expense.invoicedAt ? "Invoiced" : "Billable"}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-slate-600 mt-0.5 truncate">{expense.description}</p>
+                  <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                    <span>{expense.date}</span>
+                    {creator && <span>· {creator}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {canEdit && !expense.invoicedAt && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs px-2 text-slate-500"
+                      onClick={() => toggleBillable({ id: projectId, expenseId: expense.id, data: { amount: expense.amount, description: expense.description, date: expense.date, isBillable: !expense.isBillable } })}
+                      title={expense.isBillable ? "Mark as internal" : "Mark as billable"}
+                    >
+                      {expense.isBillable ? "Mark Internal" : "Mark Billable"}
+                    </Button>
+                  )}
+                  {!expense.invoicedAt && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-slate-400 hover:text-red-500"
+                      onClick={() => deleteExpense({ id: projectId, expenseId: expense.id })}
+                      data-testid={`button-delete-expense-${expense.id}`}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Activity Tab ─────────────────────────────────────────────────────────────
 
 function ActivityTab({ projectId }: { projectId: number }) {
@@ -1009,6 +1259,7 @@ export default function ProjectDetail() {
           <TabButton active={activeTab === "deliverables"} onClick={() => setActiveTab("deliverables")}>Deliverables</TabButton>
           <TabButton active={activeTab === "milestones"} onClick={() => setActiveTab("milestones")}>Milestones</TabButton>
           <TabButton active={activeTab === "time"} onClick={() => setActiveTab("time")}>Time Entries</TabButton>
+          <TabButton active={activeTab === "expenses"} onClick={() => setActiveTab("expenses")}>Expenses</TabButton>
           {showBilling && (
             <TabButton active={activeTab === "billing"} onClick={() => setActiveTab("billing")}>Billing Cycle</TabButton>
           )}
@@ -1021,6 +1272,7 @@ export default function ProjectDetail() {
         {activeTab === "deliverables" && <DeliverablesTab projectId={projectId} canEdit={canEdit} />}
         {activeTab === "milestones" && <MilestonesTab projectId={projectId} canEdit={canEdit} />}
         {activeTab === "time" && <TimeTab projectId={projectId} />}
+        {activeTab === "expenses" && <ExpensesTab projectId={projectId} canEdit={canEdit} />}
         {activeTab === "billing" && <BillingTab projectId={projectId} projectType={project.type} />}
         {activeTab === "activity" && <ActivityTab projectId={projectId} />}
       </div>

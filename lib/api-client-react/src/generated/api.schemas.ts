@@ -937,6 +937,57 @@ export interface AuditLogActor {
   lastName?: string | null;
 }
 
+export type ExpenseCategory =
+  (typeof ExpenseCategory)[keyof typeof ExpenseCategory];
+
+export const ExpenseCategory = {
+  travel: "travel",
+  software: "software",
+  hardware: "hardware",
+  other: "other",
+} as const;
+
+export interface Expense {
+  id: number;
+  projectId: number;
+  /** @nullable */
+  createdBy?: number | null;
+  amount: string;
+  currency: string;
+  category: ExpenseCategory;
+  description: string;
+  date: string;
+  isBillable: boolean;
+  /** @nullable */
+  invoicedAt?: string | null;
+  createdAt: string;
+  /** @nullable */
+  creatorEmail?: string | null;
+  /** @nullable */
+  creatorFirstName?: string | null;
+  /** @nullable */
+  creatorLastName?: string | null;
+}
+
+export type CreateExpenseBodyCategory =
+  (typeof CreateExpenseBodyCategory)[keyof typeof CreateExpenseBodyCategory];
+
+export const CreateExpenseBodyCategory = {
+  travel: "travel",
+  software: "software",
+  hardware: "hardware",
+  other: "other",
+} as const;
+
+export interface CreateExpenseBody {
+  amount: string;
+  currency?: string;
+  category?: CreateExpenseBodyCategory;
+  description: string;
+  date: string;
+  isBillable?: boolean;
+}
+
 /**
  * @nullable
  */
@@ -1035,6 +1086,15 @@ export type ListAuditLogsParams = {
   date_to?: string;
   limit?: number;
   offset?: number;
+};
+
+export type MarkExpensesInvoicedBody = {
+  expenseIds: number[];
+};
+
+export type MarkExpensesInvoiced200 = {
+  success?: boolean;
+  count?: number;
 };
 
 export type GetRevenueTrendParams = {

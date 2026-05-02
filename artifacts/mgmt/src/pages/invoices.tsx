@@ -10,9 +10,12 @@ import {
   useListUsers,
   useListProjects,
   useListProjectTimeEntries,
+  useListUnbilledExpenses,
+  useMarkExpensesInvoiced,
   getListInvoicesQueryKey,
   type Invoice,
   type TimeEntry,
+  type Expense,
 } from "@workspace/api-client-react";
 import { useGetMe } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -131,6 +134,7 @@ function CreateInvoiceDialog({ onCreated }: { onCreated: () => void }) {
   });
   const [lineItems, setLineItems] = useState<LineItem[]>([{ description: "", quantity: "1", unitPrice: "0" }]);
   const [selectedTimeEntries, setSelectedTimeEntries] = useState<number[]>([]);
+  const [selectedExpenseIds, setSelectedExpenseIds] = useState<number[]>([]);
   const { toast } = useToast();
   const { data: companies } = useListCompanies();
   const { data: users } = useListUsers();
@@ -139,14 +143,24 @@ function CreateInvoiceDialog({ onCreated }: { onCreated: () => void }) {
 
   const selectedProjectId = form.projectId ? parseInt(form.projectId) : 0;
   const { data: projectTimeEntries } = useListProjectTimeEntries(selectedProjectId || 1);
+  const { data: unbilledExpenses } = useListUnbilledExpenses(
+    selectedProjectId || 1,
+    { query: { enabled: selectedProjectId > 0, queryKey: ["listUnbilledExpenses", selectedProjectId] } },
+  );
 
   const selectedCompany = (companies ?? []).find(c => String(c.id) === form.companyId);
 
+  const { mutate: markInvoiced } = useMarkExpensesInvoiced();
+
   const { mutate, isPending } = useCreateInvoice({
     mutation: {
-      onSuccess: () => {
+      onSuccess: (invoice) => {
+        if (selectedExpenseIds.length > 0 && selectedProjectId > 0) {
+          markInvoiced({ id: selectedProjectId, data: { expenseIds: selectedExpenseIds } });
+        }
         toast({ title: "Invoice created" });
         setOpen(false);
+        setSelectedExpenseIds([]);
         onCreated();
       },
       onError: (e: unknown) => toast({ title: "Error", description: String(e), variant: "destructive" }),
@@ -168,6 +182,25 @@ function CreateInvoiceDialog({ onCreated }: { onCreated: () => void }) {
     });
     setSelectedTimeEntries([]);
     toast({ title: `${newItems.length} time ${newItems.length === 1 ? "entry" : "entries"} imported` });
+  }
+
+  function importExpenses() {
+    if (!unbilledExpenses || selectedExpenseIds.length === 0) return;
+    const toImport = (unbilledExpenses as Expense[]).filter(e => selectedExpenseIds.includes(e.id));
+    const newItems: LineItem[] = toImport.map(e => ({
+      description: `Expense (${e.category}): ${e.description} [${e.date}]`,
+      quantity: "1",
+      unitPrice: parseFloat(e.amount).toFixed(2),
+    }));
+    setLineItems(prev => {
+      const filtered = prev.filter(li => li.description.trim() || parseFloat(li.unitPrice) > 0);
+      return [...filtered, ...newItems];
+    });
+    toast({ title: `${newItems.length} expense${newItems.length !== 1 ? "s" : ""} imported as line items` });
+  }
+
+  function toggleExpense(id: number) {
+    setSelectedExpenseIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
 
   function toggleTimeEntry(id: number) {
@@ -357,6 +390,45 @@ function CreateInvoiceDialog({ onCreated }: { onCreated: () => void }) {
                     <span className="text-slate-500 font-mono text-xs w-24 shrink-0">{entry.date}</span>
                     <span className="text-slate-700 flex-1 truncate">{entry.description || "—"}</span>
                     <span className="text-slate-500 text-xs shrink-0">{entry.hours}h</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {selectedProjectId > 0 && unbilledExpenses && (unbilledExpenses as Expense[]).length > 0 && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-amber-800">
+                  Unbilled billable expenses ({(unbilledExpenses as Expense[]).length})
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={selectedExpenseIds.length === 0}
+                    onClick={importExpenses}
+                    className="text-xs"
+                  >
+                    Import as line items ({selectedExpenseIds.length})
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-amber-600">Selected expenses will be marked as invoiced after the invoice is created.</p>
+              <div className="max-h-36 overflow-y-auto space-y-1">
+                {(unbilledExpenses as Expense[]).map(exp => (
+                  <label key={exp.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-amber-100 rounded px-1 py-0.5">
+                    <input
+                      type="checkbox"
+                      checked={selectedExpenseIds.includes(exp.id)}
+                      onChange={() => toggleExpense(exp.id)}
+                      className="rounded"
+                    />
+                    <span className="text-slate-500 font-mono text-xs w-24 shrink-0">{exp.date}</span>
+                    <span className="text-slate-700 flex-1 truncate">{exp.description}</span>
+                    <span className="text-xs text-slate-500 shrink-0 capitalize">{exp.category}</span>
+                    <span className="text-slate-900 font-medium text-xs shrink-0">{exp.currency} {parseFloat(exp.amount).toFixed(2)}</span>
                   </label>
                 ))}
               </div>

@@ -16,3 +16,4 @@ export * from "./messages";
 export * from "./notifications";
 export * from "./compliance";
 export * from "./auditLogs";
+export * from "./expenses";

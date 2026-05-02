@@ -2233,6 +2233,134 @@ export const GetProjectActivityResponse = zod.array(
 );
 
 /**
+ * @summary List expenses for a project
+ */
+export const ListProjectExpensesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListProjectExpensesResponseItem = zod.object({
+  id: zod.number(),
+  projectId: zod.number(),
+  createdBy: zod.number().nullish(),
+  amount: zod.string(),
+  currency: zod.string(),
+  category: zod.enum(["travel", "software", "hardware", "other"]),
+  description: zod.string(),
+  date: zod.string(),
+  isBillable: zod.boolean(),
+  invoicedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  creatorEmail: zod.string().nullish(),
+  creatorFirstName: zod.string().nullish(),
+  creatorLastName: zod.string().nullish(),
+});
+export const ListProjectExpensesResponse = zod.array(
+  ListProjectExpensesResponseItem,
+);
+
+/**
+ * @summary Log an expense against a project
+ */
+export const CreateProjectExpenseParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CreateProjectExpenseBody = zod.object({
+  amount: zod.string(),
+  currency: zod.string().optional(),
+  category: zod.enum(["travel", "software", "hardware", "other"]).optional(),
+  description: zod.string(),
+  date: zod.string(),
+  isBillable: zod.boolean().optional(),
+});
+
+/**
+ * @summary List unbilled billable expenses for a project
+ */
+export const ListUnbilledExpensesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListUnbilledExpensesResponseItem = zod.object({
+  id: zod.number(),
+  projectId: zod.number(),
+  createdBy: zod.number().nullish(),
+  amount: zod.string(),
+  currency: zod.string(),
+  category: zod.enum(["travel", "software", "hardware", "other"]),
+  description: zod.string(),
+  date: zod.string(),
+  isBillable: zod.boolean(),
+  invoicedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  creatorEmail: zod.string().nullish(),
+  creatorFirstName: zod.string().nullish(),
+  creatorLastName: zod.string().nullish(),
+});
+export const ListUnbilledExpensesResponse = zod.array(
+  ListUnbilledExpensesResponseItem,
+);
+
+/**
+ * @summary Mark a list of expense IDs as invoiced
+ */
+export const MarkExpensesInvoicedParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const MarkExpensesInvoicedBody = zod.object({
+  expenseIds: zod.array(zod.number()),
+});
+
+export const MarkExpensesInvoicedResponse = zod.object({
+  success: zod.boolean().optional(),
+  count: zod.number().optional(),
+});
+
+/**
+ * @summary Update an expense
+ */
+export const UpdateProjectExpenseParams = zod.object({
+  id: zod.coerce.number(),
+  expenseId: zod.coerce.number(),
+});
+
+export const UpdateProjectExpenseBody = zod.object({
+  amount: zod.string(),
+  currency: zod.string().optional(),
+  category: zod.enum(["travel", "software", "hardware", "other"]).optional(),
+  description: zod.string(),
+  date: zod.string(),
+  isBillable: zod.boolean().optional(),
+});
+
+export const UpdateProjectExpenseResponse = zod.object({
+  id: zod.number(),
+  projectId: zod.number(),
+  createdBy: zod.number().nullish(),
+  amount: zod.string(),
+  currency: zod.string(),
+  category: zod.enum(["travel", "software", "hardware", "other"]),
+  description: zod.string(),
+  date: zod.string(),
+  isBillable: zod.boolean(),
+  invoicedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  creatorEmail: zod.string().nullish(),
+  creatorFirstName: zod.string().nullish(),
+  creatorLastName: zod.string().nullish(),
+});
+
+/**
+ * @summary Delete an expense (only if not yet invoiced)
+ */
+export const DeleteProjectExpenseParams = zod.object({
+  id: zod.coerce.number(),
+  expenseId: zod.coerce.number(),
+});
+
+/**
  * @summary Get admin/accountant summary stats (invoices, hours, offers, compliance)
  */
 export const GetAdminDashboardStatsResponse = zod.object({
