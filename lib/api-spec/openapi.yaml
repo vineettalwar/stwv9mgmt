@@ -3591,6 +3591,12 @@ components:
           type: ["integer", "null"]
         actorRole:
           type: string
+        actorEmail:
+          type: ["string", "null"]
+          description: "Snapshot of the actor's email at the time the audit row was written. Authoritative for historical display."
+        actorName:
+          type: ["string", "null"]
+          description: "Snapshot of the actor's display name at the time the audit row was written. Authoritative for historical display."
         action:
           type: string
         entityType:
@@ -3608,6 +3614,7 @@ components:
         projectId:
           type: ["integer", "null"]
         actor:
+          description: "Live join to the current users row (may be null if user was deleted). Use actorName/actorEmail for historical accuracy."
           oneOf:
             - $ref: "#/components/schemas/AuditLogActor"
             - type: "null"

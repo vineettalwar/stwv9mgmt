@@ -2146,6 +2146,18 @@ export const ListAuditLogsResponseItem = zod.object({
   createdAt: zod.coerce.date(),
   actorId: zod.number().nullish(),
   actorRole: zod.string(),
+  actorEmail: zod
+    .string()
+    .nullish()
+    .describe(
+      "Snapshot of the actor's email at the time the audit row was written. Authoritative for historical display.",
+    ),
+  actorName: zod
+    .string()
+    .nullish()
+    .describe(
+      "Snapshot of the actor's display name at the time the audit row was written. Authoritative for historical display.",
+    ),
   action: zod.string(),
   entityType: zod.string(),
   entityId: zod.number(),
@@ -2163,7 +2175,10 @@ export const ListAuditLogsResponseItem = zod.object({
       }),
       zod.null(),
     ])
-    .optional(),
+    .optional()
+    .describe(
+      "Live join to the current users row (may be null if user was deleted). Use actorName\/actorEmail for historical accuracy.",
+    ),
 });
 export const ListAuditLogsResponse = zod.array(ListAuditLogsResponseItem);
 
@@ -2179,6 +2194,18 @@ export const GetProjectActivityResponseItem = zod.object({
   createdAt: zod.coerce.date(),
   actorId: zod.number().nullish(),
   actorRole: zod.string(),
+  actorEmail: zod
+    .string()
+    .nullish()
+    .describe(
+      "Snapshot of the actor's email at the time the audit row was written. Authoritative for historical display.",
+    ),
+  actorName: zod
+    .string()
+    .nullish()
+    .describe(
+      "Snapshot of the actor's display name at the time the audit row was written. Authoritative for historical display.",
+    ),
   action: zod.string(),
   entityType: zod.string(),
   entityId: zod.number(),
@@ -2196,7 +2223,10 @@ export const GetProjectActivityResponseItem = zod.object({
       }),
       zod.null(),
     ])
-    .optional(),
+    .optional()
+    .describe(
+      "Live join to the current users row (may be null if user was deleted). Use actorName\/actorEmail for historical accuracy.",
+    ),
 });
 export const GetProjectActivityResponse = zod.array(
   GetProjectActivityResponseItem,

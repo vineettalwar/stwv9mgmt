@@ -885,6 +885,16 @@ export interface AuditLog {
   /** @nullable */
   actorId?: number | null;
   actorRole: string;
+  /**
+   * Snapshot of the actor's email at the time the audit row was written. Authoritative for historical display.
+   * @nullable
+   */
+  actorEmail?: string | null;
+  /**
+   * Snapshot of the actor's display name at the time the audit row was written. Authoritative for historical display.
+   * @nullable
+   */
+  actorName?: string | null;
   action: string;
   entityType: string;
   entityId: number;
@@ -896,6 +906,7 @@ export interface AuditLog {
   newValue?: AuditLogNewValue;
   /** @nullable */
   projectId?: number | null;
+  /** Live join to the current users row (may be null if user was deleted). Use actorName/actorEmail for historical accuracy. */
   actor?: AuditLogActor | null;
 }
 
