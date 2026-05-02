@@ -12,6 +12,7 @@ import {
   contractsTable,
 } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
+import { safeLogoFetch } from "../lib/safeLogoFetch";
 
 const router: IRouter = Router();
 
@@ -252,15 +253,10 @@ router.get("/offers/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise
   doc.fontSize(10).font("Helvetica").text(offer.offerNumber, 50, 54);
   doc.fillColor("#ffffff").fontSize(10).text(offer.status.toUpperCase(), doc.page.width - 150, 38, { width: 100, align: "right" });
 
-  // Company logo (top-right of header, if available)
+  // Company logo (top-right of header) — SSRF-safe fetch
   if (company?.logoUrl) {
-    try {
-      const logoRes = await fetch(company.logoUrl);
-      if (logoRes.ok) {
-        const logoBuf = Buffer.from(await logoRes.arrayBuffer());
-        doc.image(logoBuf, doc.page.width - 180, 10, { fit: [120, 60] });
-      }
-    } catch { /* logo unavailable — skip */ }
+    const logoBuf = await safeLogoFetch(company.logoUrl);
+    if (logoBuf) doc.image(logoBuf, doc.page.width - 180, 10, { fit: [120, 60] });
   }
 
   // Company & Client columns
