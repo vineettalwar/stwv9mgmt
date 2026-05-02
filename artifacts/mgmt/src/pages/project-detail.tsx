@@ -1201,6 +1201,7 @@ export default function ProjectDetail() {
   const { data: me } = useGetMe();
 
   const canEdit = !!me && ["admin", "project_manager"].includes(me.role);
+  const isClient = !!me && me.role === "client";
 
   if (isLoading) {
     return (
@@ -1260,7 +1261,7 @@ export default function ProjectDetail() {
           <TabButton active={activeTab === "deliverables"} onClick={() => setActiveTab("deliverables")}>Deliverables</TabButton>
           <TabButton active={activeTab === "milestones"} onClick={() => setActiveTab("milestones")}>Milestones</TabButton>
           <TabButton active={activeTab === "time"} onClick={() => setActiveTab("time")}>Time Entries</TabButton>
-          <TabButton active={activeTab === "expenses"} onClick={() => setActiveTab("expenses")}>Expenses</TabButton>
+          {!isClient && <TabButton active={activeTab === "expenses"} onClick={() => setActiveTab("expenses")}>Expenses</TabButton>}
           {showBilling && (
             <TabButton active={activeTab === "billing"} onClick={() => setActiveTab("billing")}>Billing Cycle</TabButton>
           )}
@@ -1273,7 +1274,7 @@ export default function ProjectDetail() {
         {activeTab === "deliverables" && <DeliverablesTab projectId={projectId} canEdit={canEdit} />}
         {activeTab === "milestones" && <MilestonesTab projectId={projectId} canEdit={canEdit} />}
         {activeTab === "time" && <TimeTab projectId={projectId} />}
-        {activeTab === "expenses" && <ExpensesTab projectId={projectId} canEdit={canEdit} />}
+        {activeTab === "expenses" && !isClient && <ExpensesTab projectId={projectId} canEdit={canEdit} />}
         {activeTab === "billing" && <BillingTab projectId={projectId} projectType={project.type} />}
         {activeTab === "activity" && <ActivityTab projectId={projectId} />}
       </div>
