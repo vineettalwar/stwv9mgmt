@@ -8,8 +8,12 @@ import {
   useListProjects,
   useListCompanies,
   useConvertOfferToContract,
+  useSendOffer,
+  useSendContract,
+  useSendInvoice,
   getListOffersQueryKey,
   getListContractsQueryKey,
+  getListInvoicesQueryKey,
   type Offer,
   type Contract,
   type Invoice,
@@ -35,6 +39,7 @@ import {
   FileSignature,
   Receipt,
   Download,
+  Send,
   ArrowRightLeft,
   RefreshCw,
   FolderOpen,
@@ -106,6 +111,7 @@ function OfferCard({
   onConvert,
   converting,
   onDownload,
+  onSend,
 }: {
   offer: Offer;
   linkedContracts: Contract[];
@@ -113,9 +119,12 @@ function OfferCard({
   onConvert: (offerId: number) => void;
   converting: boolean;
   onDownload: (type: "offer", id: number, number: string) => void;
+  onSend: (type: "offer", id: number) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const canConvert = (offer.status === "draft" || offer.status === "sent") && linkedContracts.length === 0;
+  const offerData = offer as unknown as { client?: { email: string } | null };
+  const hasClientEmail = !!offerData.client?.email;
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
@@ -180,6 +189,16 @@ function OfferCard({
         >
           <Download className="h-3 w-3 mr-1" /> PDF
         </Button>
+        {hasClientEmail && (offer.status === "draft" || offer.status === "sent") && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs text-blue-600 hover:text-blue-800"
+            onClick={() => onSend("offer", offer.id)}
+          >
+            <Send className="h-3 w-3 mr-1" /> Send
+          </Button>
+        )}
         {canConvert && (
           <Button
             size="sm"
@@ -201,11 +220,13 @@ function ContractCard({
   sourceOffer,
   relatedInvoices,
   onDownload,
+  onSend,
 }: {
   contract: Contract;
   sourceOffer: Offer | undefined;
   relatedInvoices: Invoice[];
   onDownload: (type: "contract", id: number, number: string) => void;
+  onSend: (type: "contract", id: number) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -275,6 +296,17 @@ function ContractCard({
         >
           <Download className="h-3 w-3 mr-1" /> PDF
         </Button>
+        {(contract as unknown as { client?: { email: string } | null }).client?.email
+          && (contract.status === "draft" || contract.status === "sent") && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs text-blue-600 hover:text-blue-800"
+            onClick={() => onSend("contract", contract.id)}
+          >
+            <Send className="h-3 w-3 mr-1" /> Send
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -285,11 +317,13 @@ function InvoiceCard({
   relatedContracts,
   project,
   onDownload,
+  onSend,
 }: {
   invoice: Invoice;
   relatedContracts: Contract[];
   project: Project | null;
   onDownload: (type: "invoice", id: number, number: string) => void;
+  onSend: (type: "invoice", id: number) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const isOverdue = invoice.status === "overdue";
@@ -362,6 +396,17 @@ function InvoiceCard({
         >
           <Download className="h-3 w-3 mr-1" /> PDF
         </Button>
+        {(invoice as unknown as { client?: { email: string } | null }).client?.email
+          && (invoice.status === "draft" || invoice.status === "sent") && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs text-blue-600 hover:text-blue-800"
+            onClick={() => onSend("invoice", invoice.id)}
+          >
+            <Send className="h-3 w-3 mr-1" /> Send
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -396,11 +441,12 @@ function PipelineColumn({
   );
 }
 
-function PipelineGroupCard({ group, onConvert, convertingId, onDownload }: {
+function PipelineGroupCard({ group, onConvert, convertingId, onDownload, onSend }: {
   group: PipelineGroup;
   onConvert: (offerId: number) => void;
   convertingId: number | null;
   onDownload: (type: "offer" | "contract" | "invoice", id: number, number: string) => void;
+  onSend: (type: "offer" | "contract" | "invoice", id: number) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -478,6 +524,7 @@ function PipelineGroupCard({ group, onConvert, convertingId, onDownload }: {
                   onConvert={onConvert}
                   converting={convertingId === offer.id}
                   onDownload={onDownload}
+                  onSend={onSend}
                 />
               ))}
             </PipelineColumn>
@@ -494,6 +541,7 @@ function PipelineGroupCard({ group, onConvert, convertingId, onDownload }: {
                   sourceOffer={contract.offerId != null ? offerById.get(contract.offerId) : undefined}
                   relatedInvoices={group.invoices}
                   onDownload={onDownload}
+                  onSend={onSend}
                 />
               ))}
             </PipelineColumn>
@@ -510,6 +558,7 @@ function PipelineGroupCard({ group, onConvert, convertingId, onDownload }: {
                   relatedContracts={group.contracts}
                   project={group.project}
                   onDownload={onDownload}
+                  onSend={onSend}
                 />
               ))}
             </PipelineColumn>
@@ -535,6 +584,9 @@ export default function Pipeline() {
   const { data: companiesRaw } = useListCompanies();
 
   const convertMutation = useConvertOfferToContract();
+  const sendOfferMutation = useSendOffer();
+  const sendContractMutation = useSendContract();
+  const sendInvoiceMutation = useSendInvoice();
 
   const offers: Offer[] = offersRaw ?? [];
   const contracts: Contract[] = contractsRaw ?? [];
@@ -622,6 +674,24 @@ export default function Pipeline() {
     }
   }
 
+  async function handleSend(type: "offer" | "contract" | "invoice", id: number) {
+    try {
+      if (type === "offer") {
+        await sendOfferMutation.mutateAsync({ id });
+        await queryClient.invalidateQueries({ queryKey: getListOffersQueryKey() });
+      } else if (type === "contract") {
+        await sendContractMutation.mutateAsync({ id });
+        await queryClient.invalidateQueries({ queryKey: getListContractsQueryKey() });
+      } else {
+        await sendInvoiceMutation.mutateAsync({ id });
+        await queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
+      }
+      toast({ title: `${type.charAt(0).toUpperCase() + type.slice(1)} sent`, description: "Email delivered to client." });
+    } catch {
+      toast({ title: "Send failed", description: `Could not send ${type} email.`, variant: "destructive" });
+    }
+  }
+
   function handleRefresh() {
     refetchOffers();
     refetchContracts();
@@ -692,6 +762,7 @@ export default function Pipeline() {
               onConvert={handleConvert}
               convertingId={convertingId}
               onDownload={handleDownload}
+              onSend={handleSend}
             />
           ))}
         </div>

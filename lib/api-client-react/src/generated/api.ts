@@ -59,6 +59,7 @@ import type {
   ProjectAssignment,
   ProjectThread,
   SeedComplianceBody,
+  SendDocumentResponse,
   SendMessageBody,
   TimeEntry,
   TimeEntryWithProject,
@@ -4301,6 +4302,90 @@ export function useGetOfferPdf<
 }
 
 /**
+ * @summary Send offer to client via email with PDF attached
+ */
+export const getSendOfferUrl = (id: number) => {
+  return `/api/offers/${id}/send`;
+};
+
+export const sendOffer = async (
+  id: number,
+  options?: RequestInit,
+): Promise<SendDocumentResponse> => {
+  return customFetch<SendDocumentResponse>(getSendOfferUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getSendOfferMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendOffer>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof sendOffer>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["sendOffer"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof sendOffer>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return sendOffer(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SendOfferMutationResult = NonNullable<
+  Awaited<ReturnType<typeof sendOffer>>
+>;
+
+export type SendOfferMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Send offer to client via email with PDF attached
+ */
+export const useSendOffer = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendOffer>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof sendOffer>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getSendOfferMutationOptions(options));
+};
+
+/**
  * @summary Convert offer to contract
  */
 export const getConvertOfferToContractUrl = (id: number) => {
@@ -4804,6 +4889,90 @@ export const useDeleteContract = <
   TContext
 > => {
   return useMutation(getDeleteContractMutationOptions(options));
+};
+
+/**
+ * @summary Send contract to client via email with PDF attached
+ */
+export const getSendContractUrl = (id: number) => {
+  return `/api/contracts/${id}/send`;
+};
+
+export const sendContract = async (
+  id: number,
+  options?: RequestInit,
+): Promise<SendDocumentResponse> => {
+  return customFetch<SendDocumentResponse>(getSendContractUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getSendContractMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendContract>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof sendContract>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["sendContract"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof sendContract>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return sendContract(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SendContractMutationResult = NonNullable<
+  Awaited<ReturnType<typeof sendContract>>
+>;
+
+export type SendContractMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Send contract to client via email with PDF attached
+ */
+export const useSendContract = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendContract>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof sendContract>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getSendContractMutationOptions(options));
 };
 
 /**
@@ -5579,6 +5748,90 @@ export const useDeleteInvoice = <
   TContext
 > => {
   return useMutation(getDeleteInvoiceMutationOptions(options));
+};
+
+/**
+ * @summary Send invoice to client via email with PDF attached
+ */
+export const getSendInvoiceUrl = (id: number) => {
+  return `/api/invoices/${id}/send`;
+};
+
+export const sendInvoice = async (
+  id: number,
+  options?: RequestInit,
+): Promise<SendDocumentResponse> => {
+  return customFetch<SendDocumentResponse>(getSendInvoiceUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getSendInvoiceMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendInvoice>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof sendInvoice>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["sendInvoice"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof sendInvoice>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return sendInvoice(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SendInvoiceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof sendInvoice>>
+>;
+
+export type SendInvoiceMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Send invoice to client via email with PDF attached
+ */
+export const useSendInvoice = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendInvoice>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof sendInvoice>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getSendInvoiceMutationOptions(options));
 };
 
 /**

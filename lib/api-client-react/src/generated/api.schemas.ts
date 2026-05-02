@@ -9,6 +9,11 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface SendDocumentResponse {
+  success: boolean;
+  email: string;
+}
+
 export interface ErrorResponse {
   error: string;
 }

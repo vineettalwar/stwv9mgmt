@@ -2,6 +2,8 @@ import { Router, type IRouter } from "express";
 import { eq, and, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import PDFDocument from "pdfkit";
+import { pdfToBuffer } from "../lib/pdfBuffer";
+import { sendDocumentEmail } from "../lib/emailService";
 import {
   db,
   pool,
@@ -247,29 +249,9 @@ router.get("/invoices/:id", requireAuth, loadDbUser, async (req, res): Promise<v
   res.json(invoice);
 });
 
-// PDF export — server-side generated PDF for a single invoice
-router.get("/invoices/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise<void> => {
-  const user = req.dbUser!;
-  const isStaff = ADMIN_PM_ACCT.includes(user.role);
-  const isClient = user.role === "client";
-  if (!isStaff && !isClient) { res.status(403).json({ error: "Forbidden" }); return; }
-  const id = parseInt(String(req.params.id));
-  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+type InvoiceFull = NonNullable<Awaited<ReturnType<typeof getInvoiceWithDetails>>>;
 
-  const invoiceRaw = await getInvoiceWithDetails(id);
-  if (!invoiceRaw) { res.status(404).json({ error: "Not found" }); return; }
-  // Clients can only download invoices for their assigned companies or directly addressed to them
-  if (isClient) {
-    const assignments = await db
-      .select({ companyId: userCompanyAssignmentsTable.companyId })
-      .from(userCompanyAssignmentsTable)
-      .where(eq(userCompanyAssignmentsTable.userId, user.id));
-    const clientCompanyIds = assignments.map(a => a.companyId);
-    const allowed = clientCompanyIds.includes(invoiceRaw.companyId) || invoiceRaw.clientId === user.id;
-    if (!allowed) { res.status(403).json({ error: "Forbidden" }); return; }
-  }
-  const invoice = invoiceRaw;
-
+async function buildInvoicePdf(doc: InstanceType<typeof PDFDocument>, invoice: InvoiceFull): Promise<void> {
   const TAX_LABELS: Record<string, string> = {
     none: "No Tax",
     vat: "MwSt 19% (VAT)",
@@ -284,12 +266,6 @@ router.get("/invoices/:id/pdf", requireAuth, loadDbUser, async (req, res): Promi
     if (!invoice.client) return "—";
     return [invoice.client.firstName, invoice.client.lastName].filter(Boolean).join(" ") || invoice.client.email;
   }
-
-  const doc = new PDFDocument({ margin: 50, size: "A4" });
-  const filename = `invoice-${invoice.invoiceNumber}.pdf`;
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  doc.pipe(res);
 
   const cur = invoice.currency;
   const BLUE = "#1e3a5f";
@@ -399,8 +375,69 @@ router.get("/invoices/:id/pdf", requireAuth, loadDbUser, async (req, res): Promi
     doc.fillColor(BLUE).fontSize(9).font("Helvetica-Bold").text("NOTES", 50, rowY);
     doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(invoice.notes, 50, rowY + 12, { width: doc.page.width - 100 });
   }
+}
 
+// PDF export — server-side generated PDF for a single invoice
+router.get("/invoices/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise<void> => {
+  const user = req.dbUser!;
+  const isStaff = ADMIN_PM_ACCT.includes(user.role);
+  const isClient = user.role === "client";
+  if (!isStaff && !isClient) { res.status(403).json({ error: "Forbidden" }); return; }
+  const id = parseInt(String(req.params.id));
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const invoiceRaw = await getInvoiceWithDetails(id);
+  if (!invoiceRaw) { res.status(404).json({ error: "Not found" }); return; }
+  if (isClient) {
+    const assignments = await db
+      .select({ companyId: userCompanyAssignmentsTable.companyId })
+      .from(userCompanyAssignmentsTable)
+      .where(eq(userCompanyAssignmentsTable.userId, user.id));
+    const clientCompanyIds = assignments.map(a => a.companyId);
+    const allowed = clientCompanyIds.includes(invoiceRaw.companyId) || invoiceRaw.clientId === user.id;
+    if (!allowed) { res.status(403).json({ error: "Forbidden" }); return; }
+  }
+  const doc = new PDFDocument({ margin: 50, size: "A4" });
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="invoice-${invoiceRaw.invoiceNumber}.pdf"`);
+  doc.pipe(res);
+  await buildInvoicePdf(doc, invoiceRaw);
   doc.end();
+});
+
+// SEND invoice to client via email
+router.post("/invoices/:id/send", requireAuth, loadDbUser, async (req, res): Promise<void> => {
+  const user = req.dbUser!;
+  if (!ADMIN_PM_ACCT.includes(user.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const id = parseInt(String(req.params.id));
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const invoice = await getInvoiceWithDetails(id);
+  if (!invoice) { res.status(404).json({ error: "Not found" }); return; }
+  if (!invoice.client?.email) {
+    res.status(400).json({ error: "Invoice has no client with an email address" }); return;
+  }
+  try {
+    const pdfBuffer = await pdfToBuffer(doc => buildInvoicePdf(doc, invoice));
+    const recipientName = [invoice.client.firstName, invoice.client.lastName].filter(Boolean).join(" ") || invoice.client.email;
+    await sendDocumentEmail({
+      type: "invoice",
+      docNumber: invoice.invoiceNumber,
+      title: invoice.title,
+      recipientName,
+      recipientEmail: invoice.client.email,
+      fromCompanyName: invoice.company?.name ?? "STWV",
+      taxRegime: invoice.company?.taxRegime,
+      currency: invoice.currency,
+      totalAmount: invoice.totalAmount,
+      dueDate: invoice.dueDate,
+      pdfBuffer,
+      pdfFilename: `invoice-${invoice.invoiceNumber}.pdf`,
+    });
+    await db.update(invoicesTable).set({ status: "sent", updatedAt: new Date() }).where(eq(invoicesTable.id, id));
+    res.json({ success: true, email: invoice.client.email });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Email delivery failed: ${message}` });
+  }
 });
 
 // UPDATE invoice

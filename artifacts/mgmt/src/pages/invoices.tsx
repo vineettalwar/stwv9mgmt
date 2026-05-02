@@ -5,6 +5,7 @@ import {
   useCreateInvoice,
   useUpdateInvoice,
   useDeleteInvoice,
+  useSendInvoice,
   useListCompanies,
   useListUsers,
   useListProjects,
@@ -408,6 +409,15 @@ function InvoiceCard({ invoice }: { invoice: InvoiceType }) {
   const project = (invoice as unknown as { project?: { id: number; name: string } | null }).project;
   const company = (invoice as unknown as { company?: { name: string } | null }).company;
   const { getToken } = useAuth();
+  const sendInvoiceMutation = useSendInvoice({
+    mutation: {
+      onSuccess: (data) => {
+        toast({ title: "Invoice sent", description: `Email delivered to ${data.email}` });
+        qc.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
+      },
+      onError: (e: unknown) => toast({ title: "Send failed", description: String(e), variant: "destructive" }),
+    },
+  });
 
   async function handleDownloadPdf() {
     try {
@@ -470,9 +480,21 @@ function InvoiceCard({ invoice }: { invoice: InvoiceType }) {
             <Button variant="ghost" size="icon" onClick={handleDownloadPdf} title="Download PDF">
               <Download className="h-4 w-4" />
             </Button>
+            {client?.email && (invoice.status === "draft" || invoice.status === "sent") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={sendInvoiceMutation.isPending}
+                onClick={() => sendInvoiceMutation.mutate({ id: invoice.id })}
+                title={`Send to ${client.email}`}
+              >
+                <Send className="h-3.5 w-3.5 mr-1" />
+                {sendInvoiceMutation.isPending ? "Sending…" : "Send to Client"}
+              </Button>
+            )}
             {invoice.status === "draft" && (
               <Button variant="ghost" size="sm" onClick={() => updateInvoice({ id: invoice.id, data: { status: "sent" } })}>
-                <Send className="h-3.5 w-3.5 mr-1" /> Mark Sent
+                Mark Sent
               </Button>
             )}
             {invoice.status === "sent" && (

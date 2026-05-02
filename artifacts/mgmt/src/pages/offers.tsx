@@ -6,6 +6,7 @@ import {
   useUpdateOffer,
   useDeleteOffer,
   useConvertOfferToContract,
+  useSendOffer,
   useListCompanies,
   useListUsers,
   useListProjects,
@@ -47,7 +48,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Plus, FileText, Trash2, RefreshCw, Download, ArrowRightLeft } from "lucide-react";
+import { Plus, FileText, Trash2, RefreshCw, Download, ArrowRightLeft, Send } from "lucide-react";
 import { useAuth } from "@clerk/react";
 
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
@@ -264,6 +265,15 @@ function OfferCard({ offer, onRefresh }: { offer: OfferType; onRefresh: () => vo
   const project = (offer as unknown as { project?: { id: number; name: string } | null }).project;
   const company = (offer as unknown as { company?: { name: string } | null }).company;
   const { getToken } = useAuth();
+  const sendOfferMutation = useSendOffer({
+    mutation: {
+      onSuccess: (data) => {
+        toast({ title: "Offer sent", description: `Email delivered to ${data.email}` });
+        qc.invalidateQueries({ queryKey: getListOffersQueryKey() });
+      },
+      onError: (e: unknown) => toast({ title: "Send failed", description: String(e), variant: "destructive" }),
+    },
+  });
 
   async function handleDownloadPdf() {
     try {
@@ -314,6 +324,18 @@ function OfferCard({ offer, onRefresh }: { offer: OfferType; onRefresh: () => vo
             <Button variant="ghost" size="icon" onClick={handleDownloadPdf} title="Download PDF">
               <Download className="h-4 w-4" />
             </Button>
+            {client?.email && (offer.status === "draft" || offer.status === "sent") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={sendOfferMutation.isPending}
+                onClick={() => sendOfferMutation.mutate({ id: offer.id })}
+                title={`Send to ${client.email}`}
+              >
+                <Send className="h-3.5 w-3.5 mr-1" />
+                {sendOfferMutation.isPending ? "Sending…" : "Send to Client"}
+              </Button>
+            )}
             {offer.status === "draft" && (
               <Button variant="ghost" size="sm" onClick={() => updateOffer({ id: offer.id, data: { status: "sent" } })}>
                 <RefreshCw className="h-3.5 w-3.5 mr-1" /> Mark Sent

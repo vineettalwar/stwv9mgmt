@@ -12,6 +12,8 @@ import {
 } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
 import { safeLogoFetch } from "../lib/safeLogoFetch";
+import { pdfToBuffer } from "../lib/pdfBuffer";
+import { sendDocumentEmail } from "../lib/emailService";
 
 const router: IRouter = Router();
 
@@ -140,32 +142,17 @@ router.delete("/contracts/:id", requireAuth, loadDbUser, async (req, res): Promi
   res.sendStatus(204);
 });
 
-// PDF export — server-side generated PDF for a single contract
-router.get("/contracts/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise<void> => {
-  const user = req.dbUser!;
-  if (!["admin", "project_manager", "germany_accountant", "india_accountant"].includes(user.role)) {
-    res.status(403).json({ error: "Forbidden" }); return;
-  }
-  const id = parseInt(String(req.params.id));
-  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+type ContractFull = NonNullable<Awaited<ReturnType<typeof getContractWithDetails>>>;
 
-  const contract = await getContractWithDetails(id);
-  if (!contract) { res.status(404).json({ error: "Not found" }); return; }
-
-  const company = contract.company; // typed as Company (taxNumber, address, bankDetails, logoUrl)
-  const client = contract.client;   // typed as { id, email, firstName, lastName, role } | null
+async function buildContractPdf(doc: InstanceType<typeof PDFDocument>, contract: ContractFull): Promise<void> {
+  const company = contract.company;
+  const client = contract.client;
   const project = contract.project;
 
   function partyName(): string {
     if (!client) return "—";
     return [client.firstName, client.lastName].filter(Boolean).join(" ") || client.email;
   }
-
-  const doc = new PDFDocument({ margin: 50, size: "A4" });
-  const filename = `contract-${contract.contractNumber}.pdf`;
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  doc.pipe(res);
 
   const BLUE = "#1e3a5f";
   const GRAY = "#64748b";
@@ -251,8 +238,59 @@ router.get("/contracts/:id/pdf", requireAuth, loadDbUser, async (req, res): Prom
   if (company?.bankDetails) {
     doc.fillColor(GRAY).fontSize(9).text(`Bank: ${company.bankDetails}`, 50, doc.y + 6, { width: doc.page.width - 100 });
   }
+}
 
+// PDF export — server-side generated PDF for a single contract
+router.get("/contracts/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise<void> => {
+  const user = req.dbUser!;
+  if (!["admin", "project_manager", "germany_accountant", "india_accountant"].includes(user.role)) {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
+  const id = parseInt(String(req.params.id));
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const contract = await getContractWithDetails(id);
+  if (!contract) { res.status(404).json({ error: "Not found" }); return; }
+  const doc = new PDFDocument({ margin: 50, size: "A4" });
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="contract-${contract.contractNumber}.pdf"`);
+  doc.pipe(res);
+  await buildContractPdf(doc, contract);
   doc.end();
+});
+
+// SEND contract to client via email
+router.post("/contracts/:id/send", requireAuth, loadDbUser, async (req, res): Promise<void> => {
+  const user = req.dbUser!;
+  if (!["admin", "project_manager", "germany_accountant", "india_accountant"].includes(user.role)) {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
+  const id = parseInt(String(req.params.id));
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const contract = await getContractWithDetails(id);
+  if (!contract) { res.status(404).json({ error: "Not found" }); return; }
+  if (!contract.client?.email) {
+    res.status(400).json({ error: "Contract has no client with an email address" }); return;
+  }
+  try {
+    const pdfBuffer = await pdfToBuffer(doc => buildContractPdf(doc, contract));
+    const recipientName = [contract.client.firstName, contract.client.lastName].filter(Boolean).join(" ") || contract.client.email;
+    await sendDocumentEmail({
+      type: "contract",
+      docNumber: contract.contractNumber,
+      title: contract.title,
+      recipientName,
+      recipientEmail: contract.client.email,
+      fromCompanyName: contract.company?.name ?? "STWV",
+      taxRegime: contract.company?.taxRegime,
+      pdfBuffer,
+      pdfFilename: `contract-${contract.contractNumber}.pdf`,
+    });
+    await db.update(contractsTable).set({ status: "sent", updatedAt: new Date() }).where(eq(contractsTable.id, id));
+    res.json({ success: true, email: contract.client.email });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Email delivery failed: ${message}` });
+  }
 });
 
 // LIST contract templates

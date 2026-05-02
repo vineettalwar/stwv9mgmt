@@ -1294,6 +1294,18 @@ export const GetOfferPdfParams = zod.object({
 });
 
 /**
+ * @summary Send offer to client via email with PDF attached
+ */
+export const SendOfferParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SendOfferResponse = zod.object({
+  success: zod.boolean(),
+  email: zod.string(),
+});
+
+/**
  * @summary Convert offer to contract
  */
 export const ConvertOfferToContractParams = zod.object({
@@ -1502,6 +1514,18 @@ export const UpdateContractResponse = zod.object({
  */
 export const DeleteContractParams = zod.object({
   id: zod.coerce.number(),
+});
+
+/**
+ * @summary Send contract to client via email with PDF attached
+ */
+export const SendContractParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SendContractResponse = zod.object({
+  success: zod.boolean(),
+  email: zod.string(),
 });
 
 /**
@@ -1863,6 +1887,18 @@ export const UpdateInvoiceResponse = zod.object({
  */
 export const DeleteInvoiceParams = zod.object({
   id: zod.coerce.number(),
+});
+
+/**
+ * @summary Send invoice to client via email with PDF attached
+ */
+export const SendInvoiceParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SendInvoiceResponse = zod.object({
+  success: zod.boolean(),
+  email: zod.string(),
 });
 
 /**

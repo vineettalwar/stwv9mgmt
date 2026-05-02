@@ -13,6 +13,8 @@ import {
 } from "@workspace/db";
 import { requireAuth, loadDbUser } from "../middlewares/requireRole";
 import { safeLogoFetch } from "../lib/safeLogoFetch";
+import { pdfToBuffer } from "../lib/pdfBuffer";
+import { sendDocumentEmail } from "../lib/emailService";
 
 const router: IRouter = Router();
 
@@ -212,20 +214,11 @@ router.delete("/offers/:id", requireAuth, loadDbUser, async (req, res): Promise<
   res.sendStatus(204);
 });
 
-// PDF export — server-side generated PDF for a single offer
-router.get("/offers/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise<void> => {
-  const user = req.dbUser!;
-  if (!["admin", "project_manager", "germany_accountant", "india_accountant"].includes(user.role)) {
-    res.status(403).json({ error: "Forbidden" }); return;
-  }
-  const id = parseInt(String(req.params.id));
-  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+type OfferFull = NonNullable<Awaited<ReturnType<typeof getOfferWithDetails>>>;
 
-  const offer = await getOfferWithDetails(id);
-  if (!offer) { res.status(404).json({ error: "Not found" }); return; }
-
-  const company = offer.company; // typed as Company (taxNumber, address, bankDetails, logoUrl, taxRegime)
-  const client = offer.client;   // typed as { id, email, firstName, lastName, role } | null
+async function buildOfferPdf(doc: InstanceType<typeof PDFDocument>, offer: OfferFull): Promise<void> {
+  const company = offer.company;
+  const client = offer.client;
   const project = offer.project;
 
   function f(v: string | number | null | undefined): string {
@@ -235,12 +228,6 @@ router.get("/offers/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise
     if (!client) return "—";
     return [client.firstName, client.lastName].filter(Boolean).join(" ") || client.email;
   }
-
-  const doc = new PDFDocument({ margin: 50, size: "A4" });
-  const filename = `offer-${offer.offerNumber}.pdf`;
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  doc.pipe(res);
 
   const cur = offer.currency ?? "EUR";
   const BLUE = "#1e3a5f";
@@ -383,7 +370,62 @@ router.get("/offers/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise
     doc.fillColor(GRAY).fontSize(9).font("Helvetica").text(`Bank: ${company.bankDetails}`, 50, rowY, { width: doc.page.width - 100 });
   }
 
+}
+
+// PDF export — server-side generated PDF for a single offer
+router.get("/offers/:id/pdf", requireAuth, loadDbUser, async (req, res): Promise<void> => {
+  const user = req.dbUser!;
+  if (!["admin", "project_manager", "germany_accountant", "india_accountant"].includes(user.role)) {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
+  const id = parseInt(String(req.params.id));
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const offer = await getOfferWithDetails(id);
+  if (!offer) { res.status(404).json({ error: "Not found" }); return; }
+  const doc = new PDFDocument({ margin: 50, size: "A4" });
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="offer-${offer.offerNumber}.pdf"`);
+  doc.pipe(res);
+  await buildOfferPdf(doc, offer);
   doc.end();
+});
+
+// SEND offer to client via email
+router.post("/offers/:id/send", requireAuth, loadDbUser, async (req, res): Promise<void> => {
+  const user = req.dbUser!;
+  if (!["admin", "project_manager", "germany_accountant", "india_accountant"].includes(user.role)) {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
+  const id = parseInt(String(req.params.id));
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const offer = await getOfferWithDetails(id);
+  if (!offer) { res.status(404).json({ error: "Not found" }); return; }
+  if (!offer.client?.email) {
+    res.status(400).json({ error: "Offer has no client with an email address" }); return;
+  }
+  try {
+    const pdfBuffer = await pdfToBuffer(doc => buildOfferPdf(doc, offer));
+    const recipientName = [offer.client.firstName, offer.client.lastName].filter(Boolean).join(" ") || offer.client.email;
+    await sendDocumentEmail({
+      type: "offer",
+      docNumber: offer.offerNumber,
+      title: offer.title,
+      recipientName,
+      recipientEmail: offer.client.email,
+      fromCompanyName: offer.company?.name ?? "STWV",
+      taxRegime: offer.company?.taxRegime,
+      currency: offer.currency,
+      totalAmount: offer.totalAmount,
+      validUntil: offer.validUntil,
+      pdfBuffer,
+      pdfFilename: `offer-${offer.offerNumber}.pdf`,
+    });
+    await db.update(offersTable).set({ status: "sent", updatedAt: new Date() }).where(eq(offersTable.id, id));
+    res.json({ success: true, email: offer.client.email });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Email delivery failed: ${message}` });
+  }
 });
 
 // CONVERT offer to contract

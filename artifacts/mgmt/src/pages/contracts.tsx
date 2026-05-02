@@ -5,6 +5,7 @@ import {
   useCreateContract,
   useUpdateContract,
   useDeleteContract,
+  useSendContract,
   useListCompanies,
   useListUsers,
   useListProjects,
@@ -45,7 +46,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, FileSignature, Trash2, Download, CheckCircle, Eye } from "lucide-react";
+import { Plus, FileSignature, Trash2, Download, CheckCircle, Eye, Send } from "lucide-react";
 import { useAuth } from "@clerk/react";
 
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
@@ -280,6 +281,15 @@ function ContractCard({ contract }: { contract: ContractType }) {
   const project = (contract as unknown as { project?: { id: number; name: string } | null }).project;
   const company = (contract as unknown as { company?: { name: string } | null }).company;
   const { getToken } = useAuth();
+  const sendContractMutation = useSendContract({
+    mutation: {
+      onSuccess: (data) => {
+        toast({ title: "Contract sent", description: `Email delivered to ${data.email}` });
+        qc.invalidateQueries({ queryKey: getListContractsQueryKey() });
+      },
+      onError: (e: unknown) => toast({ title: "Send failed", description: String(e), variant: "destructive" }),
+    },
+  });
 
   async function handleDownloadPdf() {
     try {
@@ -325,6 +335,18 @@ function ContractCard({ contract }: { contract: ContractType }) {
             <Button variant="ghost" size="icon" onClick={handleDownloadPdf} title="Download PDF">
               <Download className="h-4 w-4" />
             </Button>
+            {client?.email && (contract.status === "draft" || contract.status === "sent") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={sendContractMutation.isPending}
+                onClick={() => sendContractMutation.mutate({ id: contract.id })}
+                title={`Send to ${client.email}`}
+              >
+                <Send className="h-3.5 w-3.5 mr-1" />
+                {sendContractMutation.isPending ? "Sending…" : "Send to Client"}
+              </Button>
+            )}
             {contract.status !== "signed" && contract.status !== "cancelled" && (
               <Button variant="ghost" size="sm" onClick={() => updateContract({ id: contract.id, data: { status: "signed" } })}>
                 <CheckCircle className="h-3.5 w-3.5 mr-1" /> Mark Signed

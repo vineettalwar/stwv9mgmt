@@ -1136,6 +1136,38 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /offers/{id}/send:
+    post:
+      operationId: sendOffer
+      tags: [offers]
+      summary: Send offer to client via email with PDF attached
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Email sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendDocumentResponse"
+        "400":
+          description: No client email configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Email delivery failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /offers/{id}/convert-to-contract:
     post:
       operationId: convertOfferToContract
@@ -1260,6 +1292,38 @@ paths:
       responses:
         "204":
           description: Deleted
+
+  /contracts/{id}/send:
+    post:
+      operationId: sendContract
+      tags: [contracts]
+      summary: Send contract to client via email with PDF attached
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Email sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendDocumentResponse"
+        "400":
+          description: No client email configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Email delivery failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /contracts/{id}/pdf:
     get:
@@ -1457,6 +1521,38 @@ paths:
       responses:
         "204":
           description: Deleted
+
+  /invoices/{id}/send:
+    post:
+      operationId: sendInvoice
+      tags: [invoices]
+      summary: Send invoice to client via email with PDF attached
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Email sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendDocumentResponse"
+        "400":
+          description: No client email configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Email delivery failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /invoices/{id}/pdf:
     get:
@@ -1793,6 +1889,17 @@ components:
           type: string
       required:
         - status
+
+    SendDocumentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        email:
+          type: string
+      required:
+        - success
+        - email
 
     ErrorResponse:
       type: object
