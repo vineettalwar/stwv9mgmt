@@ -485,20 +485,21 @@ router.post("/offers/:id/convert-to-contract", requireAuth, loadDbUser, async (r
 
   const defaultContent = generateContractContent(contractType, offer);
 
-  const [contract] = await db.insert(contractsTable).values({
-    contractNumber,
-    type: contractType,
-    companyId: offer.companyId,
-    projectId: offer.projectId ?? null,
-    clientId: offer.clientId ?? null,
-    offerId: offer.id,
-    title: `Contract: ${offer.title}`,
-    content: defaultContent,
-    status: "draft",
-    createdBy: user.id,
-  }).returning();
-
+  let contract: typeof contractsTable.$inferSelect | undefined;
   await db.transaction(async (tx) => {
+    const [inserted] = await tx.insert(contractsTable).values({
+      contractNumber,
+      type: contractType,
+      companyId: offer.companyId,
+      projectId: offer.projectId ?? null,
+      clientId: offer.clientId ?? null,
+      offerId: offer.id,
+      title: `Contract: ${offer.title}`,
+      content: defaultContent,
+      status: "draft",
+      createdBy: user.id,
+    }).returning();
+    contract = inserted;
     await tx.update(offersTable).set({ status: "accepted", updatedAt: new Date() }).where(eq(offersTable.id, id));
     await logAuditTx(tx, {
       actorId: user.id,
