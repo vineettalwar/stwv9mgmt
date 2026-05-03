@@ -262,7 +262,7 @@ export function generateTaxSummaryPdf(report: TaxSummaryReportData) {
 
   const tableHead = isGermany
     ? `<tr><th>Rate Band</th><th style="text-align:right">Invoices${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">Net (Excl. Tax)${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">Tax Collected${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">Gross Total${withPrev ? " (vs prev)" : ""}</th></tr>`
-    : `<tr><th>GST Component</th><th style="text-align:right">Invoices${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">Taxable${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">CGST${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">SGST${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">IGST${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">Tax Total${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">Gross Total${withPrev ? " (vs prev)" : ""}</th></tr>`;
+    : `<tr><th>GST Component</th><th style="text-align:right">Invoices${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">${withPrev ? "Taxable (vs prev)" : "Taxable Value"}</th><th style="text-align:right">CGST${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">SGST${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">IGST${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">Tax Total${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">Gross Total${withPrev ? " (vs prev)" : ""}</th></tr>`;
 
   const comparisonBlock = withPrev && prev
     ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:10px 14px;margin-top:8px;font-size:12px;color:#1e40af">
