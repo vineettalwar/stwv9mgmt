@@ -83,6 +83,8 @@ export interface User {
   /** One of: admin, germany_accountant, india_accountant, project_manager, client, freelancer */
   role: string;
   isActive: boolean;
+  /** Configured weekly capacity in hours (default 40) */
+  weeklyCapacityHours?: number;
   companies: Company[];
   createdAt: string;
   updatedAt: string;
@@ -121,6 +123,8 @@ export interface UpdateUserBody {
   lastName?: string | null;
   role?: string;
   isActive?: boolean;
+  /** Weekly capacity in hours (1-168) */
+  weeklyCapacityHours?: number;
 }
 
 export interface UserCompanyAssignment {
@@ -1120,6 +1124,40 @@ export interface CalendarEvent {
   linkPath: string;
 }
 
+export interface ProjectHoursBreakdown {
+  projectId: number;
+  projectName: string;
+  hours: number;
+}
+
+export interface FreelancerCapacityWeek {
+  /** ISO date of the Monday starting this week */
+  weekStart: string;
+  loggedHours: number;
+  /** Percentage of capacity used (0-200+) */
+  utilization: number;
+  projects: ProjectHoursBreakdown[];
+}
+
+export interface FreelancerCapacity {
+  userId: number;
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+  email: string;
+  weeklyCapacityHours: number;
+  weeks: FreelancerCapacityWeek[];
+}
+
+export interface CapacityReport {
+  from: string;
+  to: string;
+  /** List of Monday ISO dates for all weeks in range */
+  weeks: string[];
+  freelancers: FreelancerCapacity[];
+}
+
 export type GetProjectBillingSummaryParams = {
   /**
    * YYYY-MM format, defaults to current month
@@ -1256,4 +1294,15 @@ export type ListCalendarEventsParams = {
    * End date YYYY-MM-DD (inclusive)
    */
   end: string;
+};
+
+export type GetResourcesCapacityParams = {
+  /**
+   * Start date (YYYY-MM-DD)
+   */
+  from: string;
+  /**
+   * End date (YYYY-MM-DD)
+   */
+  to: string;
 };

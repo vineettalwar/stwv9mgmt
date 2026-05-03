@@ -36,6 +36,7 @@ const SafeUpdateUserBody = z.object({
   lastName: z.string().nullable().optional(),
   role: ROLE_ENUM.optional(),
   isActive: z.boolean().optional(),
+  weeklyCapacityHours: z.number().int().min(1).max(168).optional(),
 });
 
 function getAdminEmails(): Set<string> {

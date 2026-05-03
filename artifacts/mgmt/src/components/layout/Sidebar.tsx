@@ -19,6 +19,7 @@ import {
   ScrollText,
   BarChart3,
   CalendarDays,
+  Gauge,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClerk } from "@clerk/react";
@@ -152,6 +153,13 @@ const navigation: NavItem[] = [
     href: "/reports",
     icon: BarChart3,
     testId: "nav-reports",
+    allowedRoles: ["admin", "project_manager"],
+  },
+  {
+    name: "Resources",
+    href: "/resources",
+    icon: Gauge,
+    testId: "nav-resources",
     allowedRoles: ["admin", "project_manager"],
   },
   {

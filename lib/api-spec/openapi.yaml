@@ -41,6 +41,8 @@ tags:
     description: Compliance checklists for Germany and India
   - name: audit_logs
     description: Audit trail for financially significant actions
+  - name: resources
+    description: Resource and capacity planning for freelancers
 paths:
   /healthz:
     get:
@@ -2264,6 +2266,39 @@ paths:
         "403":
           description: Forbidden
 
+  # ───── RESOURCES ─────
+  /resources/capacity:
+    get:
+      operationId: getResourcesCapacity
+      tags: [resources]
+      summary: Get freelancer capacity utilization grid
+      description: Returns weekly logged hours vs capacity for all active freelancers. Admin and project_manager only.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Start date (YYYY-MM-DD)
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+          description: End date (YYYY-MM-DD)
+      responses:
+        "200":
+          description: Capacity report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CapacityReport"
+        "400":
+          description: Missing or invalid date params
+        "403":
+          description: Forbidden
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2413,6 +2448,9 @@ components:
           description: "One of: admin, germany_accountant, india_accountant, project_manager, client, freelancer"
         isActive:
           type: boolean
+        weeklyCapacityHours:
+          type: integer
+          description: "Configured weekly capacity in hours (default 40)"
         companies:
           type: array
           items:
@@ -2477,6 +2515,9 @@ components:
           type: string
         isActive:
           type: boolean
+        weeklyCapacityHours:
+          type: integer
+          description: "Weekly capacity in hours (1-168)"
 
     UserCompanyAssignment:
       type: object
@@ -4240,4 +4281,69 @@ components:
         linkPath:
           type: string
           description: "Frontend route to the full record, e.g. /projects/1 or /invoices/3"
+
+    ProjectHoursBreakdown:
+      type: object
+      required: [projectId, projectName, hours]
+      properties:
+        projectId:
+          type: integer
+        projectName:
+          type: string
+        hours:
+          type: number
+
+    FreelancerCapacityWeek:
+      type: object
+      required: [weekStart, loggedHours, utilization, projects]
+      properties:
+        weekStart:
+          type: string
+          description: ISO date of the Monday starting this week
+        loggedHours:
+          type: number
+        utilization:
+          type: integer
+          description: "Percentage of capacity used (0-200+)"
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectHoursBreakdown"
+
+    FreelancerCapacity:
+      type: object
+      required: [userId, email, weeklyCapacityHours, weeks]
+      properties:
+        userId:
+          type: integer
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        email:
+          type: string
+        weeklyCapacityHours:
+          type: integer
+        weeks:
+          type: array
+          items:
+            $ref: "#/components/schemas/FreelancerCapacityWeek"
+
+    CapacityReport:
+      type: object
+      required: [from, to, weeks, freelancers]
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+        weeks:
+          type: array
+          items:
+            type: string
+          description: List of Monday ISO dates for all weeks in range
+        freelancers:
+          type: array
+          items:
+            $ref: "#/components/schemas/FreelancerCapacity"
 

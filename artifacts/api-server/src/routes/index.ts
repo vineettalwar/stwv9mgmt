@@ -20,6 +20,7 @@ import auditLogsRouter from "./auditLogs";
 import reportsRouter from "./reports";
 import expensesRouter from "./expenses";
 import calendarRouter from "./calendar";
+import resourcesRouter from "./resources";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use(auditLogsRouter);
 router.use(reportsRouter);
 router.use(expensesRouter);
 router.use(calendarRouter);
+router.use(resourcesRouter);
 
 export default router;

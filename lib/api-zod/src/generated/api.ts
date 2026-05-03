@@ -131,6 +131,10 @@ export const ListUsersResponseItem = zod.object({
       "One of: admin, germany_accountant, india_accountant, project_manager, client, freelancer",
     ),
   isActive: zod.boolean(),
+  weeklyCapacityHours: zod
+    .number()
+    .optional()
+    .describe("Configured weekly capacity in hours (default 40)"),
   companies: zod.array(
     zod.object({
       id: zod.number(),
@@ -179,6 +183,10 @@ export const CreateUserResponse = zod.object({
       "One of: admin, germany_accountant, india_accountant, project_manager, client, freelancer",
     ),
   isActive: zod.boolean(),
+  weeklyCapacityHours: zod
+    .number()
+    .optional()
+    .describe("Configured weekly capacity in hours (default 40)"),
   companies: zod.array(
     zod.object({
       id: zod.number(),
@@ -217,6 +225,10 @@ export const GetMeResponse = zod.object({
       "One of: admin, germany_accountant, india_accountant, project_manager, client, freelancer",
     ),
   isActive: zod.boolean(),
+  weeklyCapacityHours: zod
+    .number()
+    .optional()
+    .describe("Configured weekly capacity in hours (default 40)"),
   companies: zod.array(
     zod.object({
       id: zod.number(),
@@ -278,6 +290,10 @@ export const GetUserResponse = zod.object({
       "One of: admin, germany_accountant, india_accountant, project_manager, client, freelancer",
     ),
   isActive: zod.boolean(),
+  weeklyCapacityHours: zod
+    .number()
+    .optional()
+    .describe("Configured weekly capacity in hours (default 40)"),
   companies: zod.array(
     zod.object({
       id: zod.number(),
@@ -312,6 +328,10 @@ export const UpdateUserBody = zod.object({
   lastName: zod.string().nullish(),
   role: zod.string().optional(),
   isActive: zod.boolean().optional(),
+  weeklyCapacityHours: zod
+    .number()
+    .optional()
+    .describe("Weekly capacity in hours (1-168)"),
 });
 
 export const UpdateUserResponse = zod.object({
@@ -326,6 +346,10 @@ export const UpdateUserResponse = zod.object({
       "One of: admin, germany_accountant, india_accountant, project_manager, client, freelancer",
     ),
   isActive: zod.boolean(),
+  weeklyCapacityHours: zod
+    .number()
+    .optional()
+    .describe("Configured weekly capacity in hours (default 40)"),
   companies: zod.array(
     zod.object({
       id: zod.number(),
@@ -2576,3 +2600,47 @@ export const ListCalendarEventsResponseItem = zod.object({
 export const ListCalendarEventsResponse = zod.array(
   ListCalendarEventsResponseItem,
 );
+
+/**
+ * Returns weekly logged hours vs capacity for all active freelancers. Admin and project_manager only.
+ * @summary Get freelancer capacity utilization grid
+ */
+export const GetResourcesCapacityQueryParams = zod.object({
+  from: zod.coerce.string().describe("Start date (YYYY-MM-DD)"),
+  to: zod.coerce.string().describe("End date (YYYY-MM-DD)"),
+});
+
+export const GetResourcesCapacityResponse = zod.object({
+  from: zod.string(),
+  to: zod.string(),
+  weeks: zod
+    .array(zod.string())
+    .describe("List of Monday ISO dates for all weeks in range"),
+  freelancers: zod.array(
+    zod.object({
+      userId: zod.number(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+      email: zod.string(),
+      weeklyCapacityHours: zod.number(),
+      weeks: zod.array(
+        zod.object({
+          weekStart: zod
+            .string()
+            .describe("ISO date of the Monday starting this week"),
+          loggedHours: zod.number(),
+          utilization: zod
+            .number()
+            .describe("Percentage of capacity used (0-200+)"),
+          projects: zod.array(
+            zod.object({
+              projectId: zod.number(),
+              projectName: zod.string(),
+              hours: zod.number(),
+            }),
+          ),
+        }),
+      ),
+    }),
+  ),
+});

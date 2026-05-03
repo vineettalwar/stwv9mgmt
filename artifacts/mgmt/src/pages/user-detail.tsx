@@ -57,6 +57,7 @@ const editSchema = z.object({
   lastName: z.string().optional(),
   role: z.enum(["admin", "germany_accountant", "india_accountant", "project_manager", "client", "freelancer"]),
   isActive: z.boolean(),
+  weeklyCapacityHours: z.number().int().min(1).max(168),
 });
 
 type EditFormValues = z.infer<typeof editSchema>;
@@ -135,6 +136,7 @@ export default function UserDetail() {
       lastName: user?.lastName ?? "",
       role: (user?.role as EditFormValues["role"]) ?? "client",
       isActive: user?.isActive ?? true,
+      weeklyCapacityHours: user?.weeklyCapacityHours ?? 40,
     },
   });
 
@@ -145,6 +147,7 @@ export default function UserDetail() {
       lastName: user.lastName ?? "",
       role: user.role as EditFormValues["role"],
       isActive: user.isActive,
+      weeklyCapacityHours: (user as typeof user & { weeklyCapacityHours?: number }).weeklyCapacityHours ?? 40,
     });
     setIsEditing(true);
   }
@@ -157,6 +160,7 @@ export default function UserDetail() {
         lastName: values.lastName || null,
         role: values.role,
         isActive: values.isActive,
+        weeklyCapacityHours: values.weeklyCapacityHours,
       },
     });
   }
@@ -332,6 +336,27 @@ export default function UserDetail() {
                       </FormItem>
                     )}
                   />
+                  <FormField
+                    control={form.control}
+                    name="weeklyCapacityHours"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Weekly Capacity (hours)</FormLabel>
+                        <FormControl>
+                          <Input
+                            data-testid="input-weekly-capacity"
+                            type="number"
+                            min={1}
+                            max={168}
+                            {...field}
+                            value={field.value ?? 40}
+                            onChange={e => field.onChange(parseInt(e.target.value) || 40)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <div className="flex gap-2">
                     <Button type="submit" size="sm" disabled={updateUser.isPending} data-testid="button-save-user">
                       <Check className="h-4 w-4 mr-2" />
@@ -351,6 +376,7 @@ export default function UserDetail() {
                   { label: "Email", value: user.email },
                   { label: "Role", value: user.role.replace(/_/g, " ") },
                   { label: "Status", value: user.isActive ? "Active" : "Inactive" },
+                  { label: "Weekly Capacity", value: `${(user as typeof user & { weeklyCapacityHours?: number }).weeklyCapacityHours ?? 40}h` },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex justify-between py-1 border-b border-slate-100 last:border-0">
                     <span className="text-slate-500">{label}</span>

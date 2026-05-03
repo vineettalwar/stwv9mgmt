@@ -23,6 +23,7 @@ import type {
   AuditLog,
   BillingSummary,
   CalendarEvent,
+  CapacityReport,
   Company,
   ComplianceItem,
   Contract,
@@ -50,6 +51,7 @@ import type {
   ExportTallyParams,
   GetProjectBillingSummaryParams,
   GetProjectProfitabilityParams,
+  GetResourcesCapacityParams,
   GetRevenueTrendParams,
   GetTaxSummaryParams,
   GetTimeSummaryParams,
@@ -8479,6 +8481,107 @@ export function useListCalendarEvents<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListCalendarEventsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns weekly logged hours vs capacity for all active freelancers. Admin and project_manager only.
+ * @summary Get freelancer capacity utilization grid
+ */
+export const getGetResourcesCapacityUrl = (
+  params: GetResourcesCapacityParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/resources/capacity?${stringifiedParams}`
+    : `/api/resources/capacity`;
+};
+
+export const getResourcesCapacity = async (
+  params: GetResourcesCapacityParams,
+  options?: RequestInit,
+): Promise<CapacityReport> => {
+  return customFetch<CapacityReport>(getGetResourcesCapacityUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetResourcesCapacityQueryKey = (
+  params?: GetResourcesCapacityParams,
+) => {
+  return [`/api/resources/capacity`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetResourcesCapacityQueryOptions = <
+  TData = Awaited<ReturnType<typeof getResourcesCapacity>>,
+  TError = ErrorType<void>,
+>(
+  params: GetResourcesCapacityParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getResourcesCapacity>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetResourcesCapacityQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getResourcesCapacity>>
+  > = ({ signal }) =>
+    getResourcesCapacity(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getResourcesCapacity>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetResourcesCapacityQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getResourcesCapacity>>
+>;
+export type GetResourcesCapacityQueryError = ErrorType<void>;
+
+/**
+ * @summary Get freelancer capacity utilization grid
+ */
+
+export function useGetResourcesCapacity<
+  TData = Awaited<ReturnType<typeof getResourcesCapacity>>,
+  TError = ErrorType<void>,
+>(
+  params: GetResourcesCapacityParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getResourcesCapacity>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetResourcesCapacityQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

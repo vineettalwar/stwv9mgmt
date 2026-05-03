@@ -21,6 +21,7 @@ import {
   useCreateProjectExpense,
   useUpdateProjectExpense,
   useDeleteProjectExpense,
+  useGetResourcesCapacity,
   getGetProjectQueryKey,
   getListProjectAssignmentsQueryKey,
   getListDeliverablesQueryKey,
@@ -28,6 +29,7 @@ import {
   getListProjectTimeEntriesQueryKey,
   getGetProjectBillingSummaryQueryKey,
   getListProjectExpensesQueryKey,
+  getGetResourcesCapacityQueryKey,
 } from "@workspace/api-client-react";
 import type { Project, Expense } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -999,6 +1001,29 @@ function OverviewTab({ project, canEdit }: { project: Project; canEdit: boolean 
   const { data: users } = useListUsers();
   const [assignOpen, setAssignOpen] = useState(false);
 
+  const _today = new Date().toISOString().slice(0, 10);
+  const _thisMonday = (() => {
+    const d = new Date(_today + "T00:00:00Z");
+    const day = d.getUTCDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    d.setUTCDate(d.getUTCDate() + diff);
+    return d.toISOString().slice(0, 10);
+  })();
+  const _thisSunday = (() => {
+    const d = new Date(_thisMonday + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + 6);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  const { data: capacityData } = useGetResourcesCapacity(
+    { from: _thisMonday, to: _thisSunday },
+    { query: { enabled: assignOpen, queryKey: getGetResourcesCapacityQueryKey({ from: _thisMonday, to: _thisSunday }) } }
+  );
+
+  const utilizationMap: Record<number, number> = Object.fromEntries(
+    (capacityData?.freelancers ?? []).map(f => [f.userId, f.weeks[0]?.utilization ?? 0])
+  );
+
   const { mutate: addAssignment, isPending: adding } = useCreateProjectAssignment({
     mutation: {
       onSuccess: () => {
@@ -1099,11 +1124,17 @@ function OverviewTab({ project, canEdit }: { project: Project; canEdit: boolean 
                             <Select onValueChange={v => field.onChange(parseInt(v))} value={field.value?.toString()}>
                               <FormControl><SelectTrigger data-testid="select-assign-user"><SelectValue placeholder="Select user..." /></SelectTrigger></FormControl>
                               <SelectContent>
-                                {availableUsers.map(u => (
-                                  <SelectItem key={u.id} value={u.id.toString()}>
-                                    {u.firstName || u.lastName ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() : u.email} ({u.role})
-                                  </SelectItem>
-                                ))}
+                                {availableUsers.map(u => {
+                                  const name = u.firstName || u.lastName
+                                    ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim()
+                                    : u.email;
+                                  const util = u.role === "freelancer" ? utilizationMap[u.id] : undefined;
+                                  return (
+                                    <SelectItem key={u.id} value={u.id.toString()}>
+                                      {name} ({u.role}){util !== undefined ? ` · ${util}% this wk` : ""}
+                                    </SelectItem>
+                                  );
+                                })}
                               </SelectContent>
                             </Select>
                             <FormMessage />
