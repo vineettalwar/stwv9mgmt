@@ -70,7 +70,13 @@ router.get("/reports/tax-summary", requireAuth, loadDbUser, async (req, res): Pr
   if (user.role === "germany_accountant" && regime !== "germany") { res.status(403).json({ error: "Forbidden" }); return; }
   if (user.role === "india_accountant" && regime !== "india") { res.status(403).json({ error: "Forbidden" }); return; }
 
-  const EXCLUDED_STATUSES = ["draft", "cancelled"] as const;
+  // NOTE on data model: the schema stores tax_type and tax_rate on the invoice
+  // header (invoicesTable), not per line item. invoice_line_items only carries
+  // description/quantity/unit_price/amount with no tax fields, so the system
+  // enforces single-rate, single-component invoices by design. Aggregating from
+  // headers is therefore equivalent to (and simpler than) line-level rollups.
+  // If mixed-rate invoices are introduced later, the schema must add per-line
+  // tax fields first and this query must move to invoice_line_items joins.
 
   if (regime === "germany") {
     // Group by tax_rate to handle 19% / 7% / 0% bands
