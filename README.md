@@ -166,29 +166,26 @@ routing, and troubleshooting — see [replit.md](./replit.md).
 
 ## Pushing to GitHub
 
-This repo is wired to push to
-[`https://github.com/vineettalwar/stwv9mgmt.git`](https://github.com/vineettalwar/stwv9mgmt.git)
-as the `origin` remote. The remote was added by the agent; the actual
-push must be run by a maintainer using their own credentials, since
-GitHub no longer accepts password-based pushes.
+This repo lives on GitHub at
+[`https://github.com/vineettalwar/stwv9mgmt`](https://github.com/vineettalwar/stwv9mgmt).
+The `origin` remote points at it; `main` was pushed via a GitHub PAT
+stored as the `GITHUB_PAT` Replit Secret.
+
+To re-push after future changes from this Replit (using the PAT secret):
 
 ```bash
-# One-time, on a developer machine with GitHub access:
-git remote -v                          # confirm origin → vineettalwar/stwv9mgmt
-git push -u origin main                # uses your GitHub PAT or SSH key
+git push "https://x-access-token:${GITHUB_PAT}@github.com/vineettalwar/stwv9mgmt.git" main:main
 ```
 
-If you prefer SSH:
+Or, from a developer machine with GitHub access:
 
 ```bash
 git remote set-url origin git@github.com:vineettalwar/stwv9mgmt.git
-git push -u origin main
+git push origin main
 ```
 
-After the first push, every subsequent `git push` updates GitHub
-directly. The README, `design.md`, `roadmap.md`, `replit.md`,
-`memory.md`, and `docs/admin-guide.md` will all render on the GitHub
-project page.
+Future commits to `main` won't auto-mirror to GitHub; either run the
+command above, or set up the automation in follow-up task #46.
 
 ---
 
