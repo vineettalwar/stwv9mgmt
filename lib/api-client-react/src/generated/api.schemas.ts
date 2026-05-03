@@ -1077,6 +1077,16 @@ export const TaxSummaryReportRegime = {
   india: "india",
 } as const;
 
+export interface TaxSummaryPeriod {
+  periodStart: string;
+  periodEnd: string;
+  invoiceCount: number;
+  totalGross: string;
+  totalNet: string;
+  totalTax: string;
+  breakdown: TaxSummaryBand[];
+}
+
 export interface TaxSummaryReport {
   companyId: number;
   companyName: string;
@@ -1095,6 +1105,8 @@ export interface TaxSummaryReport {
   /** Sum of all taxAmount values */
   totalTax: string;
   breakdown: TaxSummaryBand[];
+  /** Previous-period figures for comparison; present only when prevPeriodStart/prevPeriodEnd were supplied */
+  previousPeriod?: TaxSummaryPeriod;
 }
 
 export type CalendarEventType =
@@ -1237,6 +1249,14 @@ export type GetTaxSummaryParams = {
    * End date YYYY-MM-DD (inclusive)
    */
   periodEnd: string;
+  /**
+   * Optional previous period start (YYYY-MM-DD) for period-over-period comparison. Must be paired with prevPeriodEnd.
+   */
+  prevPeriodStart?: string;
+  /**
+   * Optional previous period end (YYYY-MM-DD). Must be paired with prevPeriodStart.
+   */
+  prevPeriodEnd?: string;
 };
 
 export type GetTaxSummaryRegime =

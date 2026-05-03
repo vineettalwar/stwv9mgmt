@@ -2117,9 +2117,19 @@ paths:
           required: true
           schema: { type: string }
           description: End date YYYY-MM-DD (inclusive)
+        - in: query
+          name: prevPeriodStart
+          required: false
+          schema: { type: string }
+          description: Optional previous period start (YYYY-MM-DD) for period-over-period comparison. Must be paired with prevPeriodEnd.
+        - in: query
+          name: prevPeriodEnd
+          required: false
+          schema: { type: string }
+          description: Optional previous period end (YYYY-MM-DD). Must be paired with prevPeriodStart.
       responses:
         "200":
-          description: Tax summary with breakdown bands
+          description: Tax summary with breakdown bands (and optional previousPeriod when comparison params provided)
           content:
             application/json:
               schema:
@@ -4243,6 +4253,30 @@ components:
         totalTax:
           type: string
           description: Sum of all taxAmount values
+        breakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaxSummaryBand"
+        previousPeriod:
+          $ref: "#/components/schemas/TaxSummaryPeriod"
+          description: "Previous-period figures for comparison; present only when prevPeriodStart/prevPeriodEnd were supplied"
+
+    TaxSummaryPeriod:
+      type: object
+      required: [periodStart, periodEnd, invoiceCount, totalGross, totalNet, totalTax, breakdown]
+      properties:
+        periodStart:
+          type: string
+        periodEnd:
+          type: string
+        invoiceCount:
+          type: integer
+        totalGross:
+          type: string
+        totalNet:
+          type: string
+        totalTax:
+          type: string
         breakdown:
           type: array
           items:

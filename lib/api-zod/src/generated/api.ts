@@ -2420,6 +2420,18 @@ export const GetTaxSummaryQueryParams = zod.object({
     .string()
     .describe("Start date YYYY-MM-DD (inclusive)"),
   periodEnd: zod.coerce.string().describe("End date YYYY-MM-DD (inclusive)"),
+  prevPeriodStart: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Optional previous period start (YYYY-MM-DD) for period-over-period comparison. Must be paired with prevPeriodEnd.",
+    ),
+  prevPeriodEnd: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Optional previous period end (YYYY-MM-DD). Must be paired with prevPeriodStart.",
+    ),
 });
 
 export const GetTaxSummaryResponse = zod.object({
@@ -2468,6 +2480,56 @@ export const GetTaxSummaryResponse = zod.object({
         .describe("IGST component (India inter-state only)"),
     }),
   ),
+  previousPeriod: zod
+    .object({
+      periodStart: zod.string(),
+      periodEnd: zod.string(),
+      invoiceCount: zod.number(),
+      totalGross: zod.string(),
+      totalNet: zod.string(),
+      totalTax: zod.string(),
+      breakdown: zod.array(
+        zod.object({
+          label: zod
+            .string()
+            .describe(
+              'Human-readable band label (e.g. \"VAT 19% (Umsatzsteuer)\", \"IGST 18% (Inter-state)\")',
+            ),
+          taxType: zod
+            .string()
+            .describe("Raw tax_type from invoice (vat, cgst_sgst, igst, none)"),
+          taxRate: zod
+            .string()
+            .describe(
+              'Tax rate percentage as stored (e.g. \"19.00\", \"18.00\", \"0.00\")',
+            ),
+          invoiceCount: zod.number(),
+          grossAmount: zod.string().describe("Total amount (net + tax)"),
+          netAmount: zod.string().describe("Subtotal before tax"),
+          taxAmount: zod.string().describe("Total tax collected in this band"),
+          cgst: zod
+            .string()
+            .nullish()
+            .describe(
+              "CGST component (half of taxAmount, India intra-state only)",
+            ),
+          sgst: zod
+            .string()
+            .nullish()
+            .describe(
+              "SGST component (half of taxAmount, India intra-state only)",
+            ),
+          igst: zod
+            .string()
+            .nullish()
+            .describe("IGST component (India inter-state only)"),
+        }),
+      ),
+    })
+    .optional()
+    .describe(
+      "Previous-period figures for comparison; present only when prevPeriodStart\/prevPeriodEnd were supplied",
+    ),
 });
 
 /**

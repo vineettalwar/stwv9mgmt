@@ -31,7 +31,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { CheckCircle2, Clock, AlertCircle, Plus, RefreshCw, Shield, FileBarChart, Download, FileText } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { CheckCircle2, Clock, AlertCircle, Plus, RefreshCw, Shield, FileBarChart, Download, FileText, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { generateTaxSummaryPdf } from "@/lib/pdf-generator";
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.ElementType; className: string }> = {
@@ -118,9 +119,77 @@ function downloadTaxSummaryCsv(report: TaxSummaryReport) {
   URL.revokeObjectURL(url);
 }
 
+/** Compute the previous calendar period for monthly or quarterly compliance items. Returns null for annual items. */
+function getPreviousPeriod(item: ComplianceItem): { periodStart: string; periodEnd: string } | null {
+  const { year, quarter, month } = item;
+  if (!year) return null;
+
+  if (month != null) {
+    let py = year;
+    let pm = month - 1;
+    if (pm === 0) { py -= 1; pm = 12; }
+    const mm = String(pm).padStart(2, "0");
+    const lastDay = new Date(py, pm, 0).getDate();
+    return { periodStart: `${py}-${mm}-01`, periodEnd: `${py}-${mm}-${lastDay}` };
+  }
+
+  if (quarter != null) {
+    let pq = quarter - 1;
+    let py = year;
+    if (pq === 0) { pq = 4; py -= 1; }
+    const ranges: Record<number, [string, string]> = {
+      1: [`${py}-01-01`, `${py}-03-31`],
+      2: [`${py}-04-01`, `${py}-06-30`],
+      3: [`${py}-07-01`, `${py}-09-30`],
+      4: [`${py}-10-01`, `${py}-12-31`],
+    };
+    const r = ranges[pq];
+    if (!r) return null;
+    return { periodStart: r[0], periodEnd: r[1] };
+  }
+
+  return null; // annual — no comparison
+}
+
+/** Returns delta info or null if previous is unavailable. */
+function computeDelta(current: number, previous: number | null | undefined): { pct: number; dir: "up" | "down" | "flat" } | null {
+  if (previous === null || previous === undefined) return null;
+  if (previous === 0 && current === 0) return { pct: 0, dir: "flat" };
+  if (previous === 0) return { pct: 100, dir: "up" };
+  const change = ((current - previous) / Math.abs(previous)) * 100;
+  if (Math.abs(change) < 0.05) return { pct: 0, dir: "flat" };
+  return { pct: Math.abs(change), dir: change > 0 ? "up" : "down" };
+}
+
+function DeltaBadge({ delta, neutral = false }: { delta: { pct: number; dir: "up" | "down" | "flat" } | null; neutral?: boolean }) {
+  if (!delta) return null;
+  if (delta.dir === "flat") {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-400" title="No change vs prior period">
+        <Minus className="h-3 w-3" /> 0%
+      </span>
+    );
+  }
+  const Icon = delta.dir === "up" ? TrendingUp : TrendingDown;
+  const color = neutral
+    ? "text-slate-500"
+    : delta.dir === "up" ? "text-emerald-600" : "text-red-600";
+  const arrow = delta.dir === "up" ? "▲" : "▼";
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${color}`} title={`${delta.dir === "up" ? "Up" : "Down"} ${delta.pct.toFixed(1)}% vs prior period`}>
+      <Icon className="h-3 w-3" />
+      {arrow} {delta.pct.toFixed(1)}%
+    </span>
+  );
+}
+
 function TaxReportModal({ item }: { item: ComplianceItem }) {
   const [open, setOpen] = useState(false);
+  const [compare, setCompare] = useState(false);
   const period = getPeriod(item);
+  const prevPeriod = getPreviousPeriod(item);
+  const canCompare = !!prevPeriod;
+  const useCompare = compare && canCompare;
 
   const { data: report, isLoading, isError } = useGetTaxSummary(
     {
@@ -128,11 +197,20 @@ function TaxReportModal({ item }: { item: ComplianceItem }) {
       regime: item.regime as GetTaxSummaryRegime,
       periodStart: period?.periodStart ?? "",
       periodEnd: period?.periodEnd ?? "",
+      ...(useCompare && prevPeriod ? { prevPeriodStart: prevPeriod.periodStart, prevPeriodEnd: prevPeriod.periodEnd } : {}),
     },
     {
       query: {
         enabled: open && !!period,
-        queryKey: ["taxSummary", item.companyId, item.regime, period?.periodStart, period?.periodEnd],
+        queryKey: [
+          "taxSummary",
+          item.companyId,
+          item.regime,
+          period?.periodStart,
+          period?.periodEnd,
+          useCompare ? prevPeriod?.periodStart : null,
+          useCompare ? prevPeriod?.periodEnd : null,
+        ],
       },
     },
   );
@@ -141,6 +219,13 @@ function TaxReportModal({ item }: { item: ComplianceItem }) {
 
   const isGermany = item.regime === "germany";
   const cur = report?.currency ?? (isGermany ? "EUR" : "INR");
+  const prev = report?.previousPeriod;
+
+  // Build a lookup of prev breakdown rows keyed by "taxType|taxRate" for cell-level comparison.
+  const prevByKey = new Map<string, NonNullable<typeof prev>["breakdown"][number]>();
+  if (prev) {
+    for (const b of prev.breakdown) prevByKey.set(`${b.taxType}|${b.taxRate}`, b);
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -150,7 +235,7 @@ function TaxReportModal({ item }: { item: ComplianceItem }) {
           Report
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileBarChart className="h-5 w-5 text-slate-500" />
@@ -160,6 +245,26 @@ function TaxReportModal({ item }: { item: ComplianceItem }) {
 
         {!period && (
           <p className="text-sm text-slate-500">Cannot determine period for this item.</p>
+        )}
+
+        {/* Period-over-period comparison toggle */}
+        {canCompare && prevPeriod && (
+          <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+            <div>
+              <label htmlFor={`compare-toggle-${item.id}`} className="text-sm font-medium text-slate-700 cursor-pointer">
+                Compare to previous period
+              </label>
+              <p className="text-xs text-slate-400">
+                {prevPeriod.periodStart} → {prevPeriod.periodEnd}
+              </p>
+            </div>
+            <Switch
+              id={`compare-toggle-${item.id}`}
+              checked={compare}
+              onCheckedChange={setCompare}
+              data-testid={`switch-compare-prev-${item.id}`}
+            />
+          </div>
         )}
 
         {isLoading && (
@@ -184,18 +289,30 @@ function TaxReportModal({ item }: { item: ComplianceItem }) {
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Invoices</div>
-                <div className="text-xl font-bold text-slate-900">{report.invoiceCount}</div>
-                <div className="text-xs text-slate-400">{report.periodStart} → {report.periodEnd}</div>
+                <div className="flex items-baseline gap-2">
+                  <div className="text-xl font-bold text-slate-900">{report.invoiceCount}</div>
+                  {prev && <DeltaBadge delta={computeDelta(report.invoiceCount, prev.invoiceCount)} />}
+                </div>
+                <div className="text-xs text-slate-400 mt-0.5">{report.periodStart} → {report.periodEnd}</div>
+                {prev && <div className="text-[10px] text-slate-400">prev: {prev.invoiceCount}</div>}
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Net Revenue</div>
-                <div className="text-xl font-bold text-slate-900">{cur} {parseFloat(report.totalNet).toFixed(2)}</div>
-                <div className="text-xs text-slate-400">Excl. tax</div>
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <div className="text-xl font-bold text-slate-900">{cur} {parseFloat(report.totalNet).toFixed(2)}</div>
+                  {prev && <DeltaBadge delta={computeDelta(parseFloat(report.totalNet), parseFloat(prev.totalNet))} />}
+                </div>
+                <div className="text-xs text-slate-400 mt-0.5">Excl. tax</div>
+                {prev && <div className="text-[10px] text-slate-400">prev: {cur} {parseFloat(prev.totalNet).toFixed(2)}</div>}
               </div>
               <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
                 <div className="text-xs text-blue-600 font-medium uppercase tracking-wide mb-1">Tax Collected</div>
-                <div className="text-xl font-bold text-blue-800">{cur} {parseFloat(report.totalTax).toFixed(2)}</div>
-                <div className="text-xs text-blue-400">Output {isGermany ? "VAT" : "GST"}</div>
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <div className="text-xl font-bold text-blue-800">{cur} {parseFloat(report.totalTax).toFixed(2)}</div>
+                  {prev && <DeltaBadge delta={computeDelta(parseFloat(report.totalTax), parseFloat(prev.totalTax))} neutral />}
+                </div>
+                <div className="text-xs text-blue-400 mt-0.5">Output {isGermany ? "VAT" : "GST"}</div>
+                {prev && <div className="text-[10px] text-blue-400/80">prev: {cur} {parseFloat(prev.totalTax).toFixed(2)}</div>}
               </div>
             </div>
 
@@ -234,30 +351,87 @@ function TaxReportModal({ item }: { item: ComplianceItem }) {
                       )}
                     </thead>
                     <tbody>
-                      {report.breakdown.map((b, idx) => (
-                        <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                          {isGermany ? (
-                            <>
-                              <td className="px-3 py-2.5 font-medium text-slate-800">{b.label}</td>
-                              <td className="px-3 py-2.5 text-right text-slate-600">{b.invoiceCount}</td>
-                              <td className="px-3 py-2.5 text-right text-slate-600">{cur} {parseFloat(b.netAmount).toFixed(2)}</td>
-                              <td className="px-3 py-2.5 text-right font-medium text-blue-700">{cur} {parseFloat(b.taxAmount).toFixed(2)}</td>
-                              <td className="px-3 py-2.5 text-right text-slate-800 font-semibold">{cur} {parseFloat(b.grossAmount).toFixed(2)}</td>
-                            </>
-                          ) : (
-                            <>
-                              <td className="px-3 py-2.5 font-medium text-slate-800">{b.label}</td>
-                              <td className="px-3 py-2.5 text-right text-slate-600">{b.invoiceCount}</td>
-                              <td className="px-3 py-2.5 text-right text-slate-600">{cur} {parseFloat(b.netAmount).toFixed(2)}</td>
-                              <td className="px-3 py-2.5 text-right text-slate-600">{b.cgst ? `${cur} ${parseFloat(b.cgst).toFixed(2)}` : "—"}</td>
-                              <td className="px-3 py-2.5 text-right text-slate-600">{b.sgst ? `${cur} ${parseFloat(b.sgst).toFixed(2)}` : "—"}</td>
-                              <td className="px-3 py-2.5 text-right text-slate-600">{b.igst ? `${cur} ${parseFloat(b.igst).toFixed(2)}` : "—"}</td>
-                              <td className="px-3 py-2.5 text-right font-medium text-blue-700">{cur} {parseFloat(b.taxAmount).toFixed(2)}</td>
-                              <td className="px-3 py-2.5 text-right text-slate-800 font-semibold">{cur} {parseFloat(b.grossAmount).toFixed(2)}</td>
-                            </>
-                          )}
-                        </tr>
-                      ))}
+                      {report.breakdown.map((b, idx) => {
+                        const pb = prevByKey.get(`${b.taxType}|${b.taxRate}`);
+                        const renderAmt = (cur: string, val: string, prevVal?: string | null, opts?: { neutral?: boolean }) => {
+                          const main = `${cur} ${parseFloat(val).toFixed(2)}`;
+                          if (!prev) return main;
+                          const prevNum = prevVal != null ? parseFloat(prevVal) : 0;
+                          return (
+                            <div className="flex flex-col items-end leading-tight">
+                              <span>{main}</span>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <span className="text-[10px] text-slate-400">prev: {cur} {prevNum.toFixed(2)}</span>
+                                <DeltaBadge delta={computeDelta(parseFloat(val), prevNum)} neutral={opts?.neutral} />
+                              </div>
+                            </div>
+                          );
+                        };
+                        const renderCount = (val: number, prevVal?: number) => {
+                          if (!prev) return val;
+                          const pv = prevVal ?? 0;
+                          return (
+                            <div className="flex flex-col items-end leading-tight">
+                              <span>{val}</span>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <span className="text-[10px] text-slate-400">prev: {pv}</span>
+                                <DeltaBadge delta={computeDelta(val, pv)} />
+                              </div>
+                            </div>
+                          );
+                        };
+                        return (
+                          <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 align-top">
+                            {isGermany ? (
+                              <>
+                                <td className="px-3 py-2.5 font-medium text-slate-800">{b.label}</td>
+                                <td className="px-3 py-2.5 text-right text-slate-600">{renderCount(b.invoiceCount, pb?.invoiceCount)}</td>
+                                <td className="px-3 py-2.5 text-right text-slate-600">{renderAmt(cur, b.netAmount, pb?.netAmount)}</td>
+                                <td className="px-3 py-2.5 text-right font-medium text-blue-700">{renderAmt(cur, b.taxAmount, pb?.taxAmount, { neutral: true })}</td>
+                                <td className="px-3 py-2.5 text-right text-slate-800 font-semibold">{renderAmt(cur, b.grossAmount, pb?.grossAmount)}</td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="px-3 py-2.5 font-medium text-slate-800">{b.label}</td>
+                                <td className="px-3 py-2.5 text-right text-slate-600">{renderCount(b.invoiceCount, pb?.invoiceCount)}</td>
+                                <td className="px-3 py-2.5 text-right text-slate-600">{renderAmt(cur, b.netAmount, pb?.netAmount)}</td>
+                                <td className="px-3 py-2.5 text-right text-slate-600">{b.cgst ? renderAmt(cur, b.cgst, pb?.cgst, { neutral: true }) : "—"}</td>
+                                <td className="px-3 py-2.5 text-right text-slate-600">{b.sgst ? renderAmt(cur, b.sgst, pb?.sgst, { neutral: true }) : "—"}</td>
+                                <td className="px-3 py-2.5 text-right text-slate-600">{b.igst ? renderAmt(cur, b.igst, pb?.igst, { neutral: true }) : "—"}</td>
+                                <td className="px-3 py-2.5 text-right font-medium text-blue-700">{renderAmt(cur, b.taxAmount, pb?.taxAmount, { neutral: true })}</td>
+                                <td className="px-3 py-2.5 text-right text-slate-800 font-semibold">{renderAmt(cur, b.grossAmount, pb?.grossAmount)}</td>
+                              </>
+                            )}
+                          </tr>
+                        );
+                      })}
+                      {/* Rows that exist in previous period only (no current activity) */}
+                      {prev && prev.breakdown
+                        .filter(pb => !report.breakdown.some(b => b.taxType === pb.taxType && b.taxRate === pb.taxRate))
+                        .map((pb, idx) => (
+                          <tr key={`prev-only-${idx}`} className="border-b border-slate-100 last:border-0 bg-slate-50/40 italic align-top">
+                            {isGermany ? (
+                              <>
+                                <td className="px-3 py-2.5 font-medium text-slate-500">{pb.label} <span className="text-[10px] not-italic">(prev only)</span></td>
+                                <td className="px-3 py-2.5 text-right text-slate-400">0 <span className="text-[10px] block text-slate-400">prev: {pb.invoiceCount}</span></td>
+                                <td className="px-3 py-2.5 text-right text-slate-400">— <span className="text-[10px] block text-slate-400">prev: {cur} {parseFloat(pb.netAmount).toFixed(2)}</span></td>
+                                <td className="px-3 py-2.5 text-right text-slate-400">— <span className="text-[10px] block text-slate-400">prev: {cur} {parseFloat(pb.taxAmount).toFixed(2)}</span></td>
+                                <td className="px-3 py-2.5 text-right text-slate-400">— <span className="text-[10px] block text-slate-400">prev: {cur} {parseFloat(pb.grossAmount).toFixed(2)}</span></td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="px-3 py-2.5 font-medium text-slate-500">{pb.label} <span className="text-[10px] not-italic">(prev only)</span></td>
+                                <td className="px-3 py-2.5 text-right text-slate-400">0</td>
+                                <td className="px-3 py-2.5 text-right text-slate-400">— <span className="text-[10px] block">prev: {cur} {parseFloat(pb.netAmount).toFixed(2)}</span></td>
+                                <td className="px-3 py-2.5 text-right text-slate-400">{pb.cgst ? <>— <span className="text-[10px] block">prev: {cur} {parseFloat(pb.cgst).toFixed(2)}</span></> : "—"}</td>
+                                <td className="px-3 py-2.5 text-right text-slate-400">{pb.sgst ? <>— <span className="text-[10px] block">prev: {cur} {parseFloat(pb.sgst).toFixed(2)}</span></> : "—"}</td>
+                                <td className="px-3 py-2.5 text-right text-slate-400">{pb.igst ? <>— <span className="text-[10px] block">prev: {cur} {parseFloat(pb.igst).toFixed(2)}</span></> : "—"}</td>
+                                <td className="px-3 py-2.5 text-right text-slate-400">— <span className="text-[10px] block">prev: {cur} {parseFloat(pb.taxAmount).toFixed(2)}</span></td>
+                                <td className="px-3 py-2.5 text-right text-slate-400">— <span className="text-[10px] block">prev: {cur} {parseFloat(pb.grossAmount).toFixed(2)}</span></td>
+                              </>
+                            )}
+                          </tr>
+                        ))}
                     </tbody>
                     <tfoot className="bg-slate-50 border-t-2 border-slate-300">
                       {isGermany ? (

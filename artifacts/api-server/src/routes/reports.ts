@@ -43,43 +43,39 @@ function toCsv(rows: Array<Record<string, unknown>>, columns: string[]): string 
 
 // ── TAX SUMMARY ──
 // Returns VAT (Germany) or GST (India) breakdown for a company/period.
-router.get("/reports/tax-summary", requireAuth, loadDbUser, async (req, res): Promise<void> => {
-  const user = req.dbUser!;
-  if (!TAX_REPORT_ROLES.includes(user.role)) { res.status(403).json({ error: "Forbidden" }); return; }
 
-  const companyId = parseIntOrUndef(req.query.companyId);
-  const regime = String(req.query.regime ?? "");
-  const periodStart = isValidDate(req.query.periodStart) ? req.query.periodStart : undefined;
-  const periodEnd = isValidDate(req.query.periodEnd) ? req.query.periodEnd : undefined;
+type TaxBand = {
+  label: string;
+  taxType: string;
+  taxRate: string;
+  invoiceCount: number;
+  grossAmount: string;
+  netAmount: string;
+  taxAmount: string;
+  cgst: string | null;
+  sgst: string | null;
+  igst: string | null;
+};
 
-  if (!companyId || !regime || !periodStart || !periodEnd) {
-    res.status(400).json({ error: "companyId, regime, periodStart, and periodEnd (YYYY-MM-DD) are required" });
-    return;
-  }
-  if (!["germany", "india"].includes(regime)) {
-    res.status(400).json({ error: "regime must be 'germany' or 'india'" });
-    return;
-  }
+type PeriodSummary = {
+  periodStart: string;
+  periodEnd: string;
+  invoiceCount: number;
+  totalGross: string;
+  totalNet: string;
+  totalTax: string;
+  breakdown: TaxBand[];
+};
 
-  // Fetch company info
-  const [company] = await db.select({ id: companiesTable.id, name: companiesTable.name, currency: companiesTable.currency })
-    .from(companiesTable).where(eq(companiesTable.id, companyId));
-  if (!company) { res.status(404).json({ error: "Company not found" }); return; }
-
-  // Role scoping: germany_accountant can only access germany regime; india_accountant only india
-  if (user.role === "germany_accountant" && regime !== "germany") { res.status(403).json({ error: "Forbidden" }); return; }
-  if (user.role === "india_accountant" && regime !== "india") { res.status(403).json({ error: "Forbidden" }); return; }
-
-  // NOTE on data model: the schema stores tax_type and tax_rate on the invoice
-  // header (invoicesTable), not per line item. invoice_line_items only carries
-  // description/quantity/unit_price/amount with no tax fields, so the system
-  // enforces single-rate, single-component invoices by design. Aggregating from
-  // headers is therefore equivalent to (and simpler than) line-level rollups.
-  // If mixed-rate invoices are introduced later, the schema must add per-line
-  // tax fields first and this query must move to invoice_line_items joins.
-
+async function computeTaxPeriod(
+  companyId: number,
+  regime: string,
+  periodStart: string,
+  periodEnd: string,
+): Promise<PeriodSummary> {
+  // NOTE on data model: tax_type and tax_rate live on invoice headers; aggregating
+  // from headers is equivalent to line-level rollups by design (single-rate invoices).
   if (regime === "germany") {
-    // Group by tax_rate to handle 19% / 7% / 0% bands
     const result = await db.execute(sql`
       SELECT
         tax_type,
@@ -106,7 +102,7 @@ router.get("/reports/tax-summary", requireAuth, loadDbUser, async (req, res): Pr
       totalTax: acc.totalTax + parseFloat(r.tax_amount),
     }), { invoiceCount: 0, totalGross: 0, totalNet: 0, totalTax: 0 });
 
-    const breakdown = rows.map(r => {
+    const breakdown: TaxBand[] = rows.map(r => {
       const rate = parseFloat(r.tax_rate);
       const label = rate === 0 ? "Tax Exempt (0%)" : `VAT ${rate.toFixed(0)}% (Umsatzsteuer)`;
       return {
@@ -123,23 +119,17 @@ router.get("/reports/tax-summary", requireAuth, loadDbUser, async (req, res): Pr
       };
     });
 
-    res.json({
-      companyId,
-      companyName: company.name,
-      regime,
-      periodStart,
-      periodEnd,
-      currency: company.currency ?? "EUR",
+    return {
+      periodStart, periodEnd,
       invoiceCount: totals.invoiceCount,
       totalGross: totals.totalGross.toFixed(2),
       totalNet: totals.totalNet.toFixed(2),
       totalTax: totals.totalTax.toFixed(2),
       breakdown,
-    });
-    return;
+    };
   }
 
-  // India GST: group by tax_type (cgst_sgst vs igst) and rate
+  // India GST
   const result = await db.execute(sql`
     SELECT
       tax_type,
@@ -166,7 +156,7 @@ router.get("/reports/tax-summary", requireAuth, loadDbUser, async (req, res): Pr
     totalTax: acc.totalTax + parseFloat(r.tax_amount),
   }), { invoiceCount: 0, totalGross: 0, totalNet: 0, totalTax: 0 });
 
-  const breakdown = rows.map(r => {
+  const breakdown: TaxBand[] = rows.map(r => {
     const taxAmt = parseFloat(r.tax_amount);
     const half = (taxAmt / 2).toFixed(2);
     const isCgstSgst = r.tax_type === "cgst_sgst";
@@ -191,18 +181,69 @@ router.get("/reports/tax-summary", requireAuth, loadDbUser, async (req, res): Pr
     };
   });
 
-  res.json({
-    companyId,
-    companyName: company.name,
-    regime,
-    periodStart,
-    periodEnd,
-    currency: company.currency ?? "INR",
+  return {
+    periodStart, periodEnd,
     invoiceCount: totals.invoiceCount,
     totalGross: totals.totalGross.toFixed(2),
     totalNet: totals.totalNet.toFixed(2),
     totalTax: totals.totalTax.toFixed(2),
     breakdown,
+  };
+}
+
+router.get("/reports/tax-summary", requireAuth, loadDbUser, async (req, res): Promise<void> => {
+  const user = req.dbUser!;
+  if (!TAX_REPORT_ROLES.includes(user.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const companyId = parseIntOrUndef(req.query.companyId);
+  const regime = String(req.query.regime ?? "");
+  const periodStart = isValidDate(req.query.periodStart) ? req.query.periodStart : undefined;
+  const periodEnd = isValidDate(req.query.periodEnd) ? req.query.periodEnd : undefined;
+  const prevPeriodStart = isValidDate(req.query.prevPeriodStart) ? req.query.prevPeriodStart : undefined;
+  const prevPeriodEnd = isValidDate(req.query.prevPeriodEnd) ? req.query.prevPeriodEnd : undefined;
+
+  if (!companyId || !regime || !periodStart || !periodEnd) {
+    res.status(400).json({ error: "companyId, regime, periodStart, and periodEnd (YYYY-MM-DD) are required" });
+    return;
+  }
+  if (!["germany", "india"].includes(regime)) {
+    res.status(400).json({ error: "regime must be 'germany' or 'india'" });
+    return;
+  }
+  if ((prevPeriodStart && !prevPeriodEnd) || (!prevPeriodStart && prevPeriodEnd)) {
+    res.status(400).json({ error: "prevPeriodStart and prevPeriodEnd must both be provided" });
+    return;
+  }
+
+  const [company] = await db.select({ id: companiesTable.id, name: companiesTable.name, currency: companiesTable.currency })
+    .from(companiesTable).where(eq(companiesTable.id, companyId));
+  if (!company) { res.status(404).json({ error: "Company not found" }); return; }
+
+  if (user.role === "germany_accountant" && regime !== "germany") { res.status(403).json({ error: "Forbidden" }); return; }
+  if (user.role === "india_accountant" && regime !== "india") { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const [main, previous] = await Promise.all([
+    computeTaxPeriod(companyId, regime, periodStart, periodEnd),
+    prevPeriodStart && prevPeriodEnd
+      ? computeTaxPeriod(companyId, regime, prevPeriodStart, prevPeriodEnd)
+      : Promise.resolve(undefined),
+  ]);
+
+  const currency = company.currency ?? (regime === "germany" ? "EUR" : "INR");
+
+  res.json({
+    companyId,
+    companyName: company.name,
+    regime,
+    periodStart: main.periodStart,
+    periodEnd: main.periodEnd,
+    currency,
+    invoiceCount: main.invoiceCount,
+    totalGross: main.totalGross,
+    totalNet: main.totalNet,
+    totalTax: main.totalTax,
+    breakdown: main.breakdown,
+    ...(previous ? { previousPeriod: previous } : {}),
   });
 });
 
