@@ -5,15 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1777753266078,
-      "tag": "0000_confused_naoko",
+      "when": 1777796406603,
+      "tag": "0000_baseline",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1777760000000,
-      "tag": "0001_add_expenses",
+      "when": 1777796406604,
+      "tag": "0001_audit_logs_triggers",
       "breakpoints": true
     }
   ]

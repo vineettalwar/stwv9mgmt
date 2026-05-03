@@ -1,218 +1,173 @@
-# STWV Management Platform
+# STWV Management Platform — Replit operating guide
 
-## Overview
+Day-to-day notes for running this project **on Replit**. For the
+high-level overview see [README.md](./README.md); for architecture
+[design.md](./design.md); for conventions [memory.md](./memory.md);
+for end-user docs [docs/admin-guide.md](./docs/admin-guide.md).
 
-Multi-company business management platform for a cross-border group: 1 German UG (VAT), 1 Indian GST company, and 2 Indian non-GST companies. Built as a pnpm workspace monorepo using TypeScript.
+---
+
+## What this app is
+
+Multi-company business management platform for a cross-border group:
+**1 German UG (VAT)**, **1 Indian GST company**, **2 Indian non-GST
+companies**. Built as a TypeScript pnpm-workspace monorepo.
 
 ## Stack
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod, drizzle-zod
-- **API codegen**: Orval (from OpenAPI spec → React hooks + Zod schemas)
-- **Build**: esbuild (CJS bundle)
-- **Auth**: Clerk (Replit-managed, `@clerk/react` + `@clerk/express`)
-- **Frontend**: React + Vite + Tailwind v4 + shadcn/ui + wouter + TanStack Query
+- **Monorepo**: pnpm workspaces (Node.js 24, TypeScript 5.9)
+- **API**: Express 5, esbuild bundle, Pino logging
+- **Database**: PostgreSQL 16 + Drizzle ORM (migrations only — no `push`)
+- **Validation**: Zod + drizzle-zod, generated from OpenAPI by Orval
+- **Auth**: Clerk (`@clerk/express` server, `@clerk/react` client)
+- **Frontend**: React 19 + Vite + Tailwind v4 + shadcn/ui + wouter +
+  TanStack Query
 
-## Workspace Structure
+## Workspace layout
 
 ```
 artifacts/
-  api-server/       — Express 5 REST API (port via $PORT)
-  mgmt/             — React+Vite management frontend (preview path: /)
+  api-server/        Express REST API     (preview path: /api)
+  mgmt/              React + Vite frontend (preview path: /)
+  mockup-sandbox/    Component canvas      (preview path: /__mockup)
 lib/
-  api-client-react/ — Orval-generated React Query hooks
-  api-spec/         — OpenAPI spec + orval config
-  api-zod/          — Orval-generated Zod validation schemas
-  db/               — Drizzle ORM schema + migrations
+  db/                Drizzle schema, migrations, seed
+  api-spec/          OpenAPI 3.1 spec + Orval config
+  api-client-react/  Generated React Query hooks
+  api-zod/           Generated Zod schemas
+scripts/             Repo-wide helper scripts
 ```
 
-## Key Commands
+---
 
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- `pnpm --filter @workspace/api-server run dev` — run API server locally
+## Artifacts & ports
 
-## Database Schema
+This project uses **path-based artifact routing**. The Replit preview
+proxies each path to the right artifact's port; ports are assigned per
+artifact via `$PORT` and you should never hard-code one.
 
-### companies
-- id, name, legalForm, country, taxRegime (vat|gst|none), taxNumber, address, bankDetails, currency (EUR|INR), isActive, createdAt, updatedAt
+| Artifact | Preview path | Notes |
+|----------|--------------|-------|
+| `mgmt` | `/` | Vite dev server, allows all hosts (proxied iframe) |
+| `api-server` | `/api` | Express, mounts everything under `/api/*` |
+| `mockup-sandbox` | `/__mockup` | Design-only; not user-facing |
 
-### users
-- id, clerkUserId, email, firstName, lastName, role (admin|germany_accountant|india_accountant|project_manager|client|freelancer), isActive, createdAt, updatedAt
+The **mgmt** frontend reaches the API via `/api/*` (path-based, no
+CORS gymnastics). When debugging from a shell, use
+`$REPLIT_DEV_DOMAIN/api/...`.
 
-### userCompanyAssignments (junction)
-- id, userId, companyId, createdAt
+## Workflows
 
-### projects
-- id, name, type (one_time|monthly_fixed|amc|internal), companyId, clientId (nullable), description, status (active|completed|on_hold), billingModel (hourly|fixed|retainer), fixedAllocationHours (text, nullable), startDate, endDate, createdAt, updatedAt
+Workflows are auto-created from `artifact.toml` files. The relevant
+ones are:
 
-### projectAssignments (junction)
-- id, projectId, userId, memberType (employee|freelancer), hourlyRate (text, nullable), monthlyRate (text, nullable), createdAt
-- Unique on (projectId, userId)
+- **API Server** — `pnpm --filter @workspace/api-server run dev`
+- **web** (mgmt) — `pnpm --filter @workspace/mgmt run dev`
+- **Component Preview Server** — `pnpm --filter @workspace/mockup-sandbox run dev`
 
-### timeEntries
-- id, projectId, userId, date (YYYY-MM-DD), hours (text), description (nullable), createdAt, updatedAt
+Restart a workflow from the Workflows panel after `package.json` or
+schema changes. Hot reload covers the rest.
 
-### deliverables
-- id, projectId, title, description (nullable), status (todo|in_progress|done), assigneeId (nullable), dueDate (nullable), createdAt, updatedAt
+## Environment variables & secrets
 
-### milestones
-- id, projectId, title, description (nullable), status (pending|completed), dueDate (nullable), completedAt (nullable), createdAt, updatedAt
+Required (per [`.env.example`](./.env.example)):
 
-### todos
-- id, projectId (nullable), clientId (nullable), title, description (nullable), priority (low|medium|high), status (open|done), assigneeId (nullable), dueDate (nullable), completedAt (nullable), createdAt, updatedAt
+- `DATABASE_URL` — Postgres connection (provisioned by the `postgresql-16` module).
+- `VITE_CLERK_PUBLISHABLE_KEY` — Clerk publishable key (frontend).
+  Bake-time only; restart the `web` workflow after changing.
+- `CLERK_SECRET_KEY` — Clerk secret key (server). Set as a Replit Secret
+  so it never lands in the repo.
 
-### messageThreads
-- id, projectId, subject (nullable), createdAt, updatedAt
+Optional:
 
-### messages
-- id, threadId, senderId, body, attachmentUrl (nullable), attachmentName (nullable), attachmentType (nullable), isRead (boolean), createdAt
+- `PLATFORM_ADMIN_EMAILS` — comma-separated allow-list of admin emails
+  auto-promoted on first sign-in.
+- `PLATFORM_ADMIN_CLERK_ID` + `PLATFORM_ADMIN_EMAIL` — alternative
+  bootstrap path used by the seed script.
+- `RESEND_API_KEY` — outbound email; if unset, emails are logged.
 
-### notifications
-- id, userId, type (new_message|deliverable_update|invoice_issued|offer_sent|contract_ready), title, body, entityType (nullable), entityId (nullable), isRead, createdAt, updatedAt
+> The Clerk publishable key in `.replit` (`[userenv.shared]`) is a
+> **dev** key. Replit auto-swaps it to the live key on deploy via
+> Secrets. Do not paste prod keys into `.replit`.
 
-### complianceChecklists
-- id, companyId, regime (germany|india), year, quarter (nullable), month (nullable), itemKey, itemLabel, deadline (YYYY-MM-DD), status (pending|filed|overdue), responsibleUserId (nullable), notes (nullable), filedAt (nullable), createdAt, updatedAt
-
-## Seeded Companies
-
-1. STWV UG — Germany, VAT, EUR
-2. STWV Technologies Pvt Ltd (GST) — India, GST, INR
-3. STWV Consulting (Non-GST A) — India, none, INR
-4. STWV Services (Non-GST B) — India, none, INR
-
-## API Routes
-
-All routes require Clerk auth (Bearer token). Prefix: `/api`
-
-- `GET /healthz` — health check
-- `GET|POST /companies` — list / create
-- `GET|PATCH|DELETE /companies/:id` — detail / update / delete
-- `GET|POST /users` — list / create
-- `GET /users/me` — current user from Clerk JWT
-- `GET|PATCH|DELETE /users/:id` — detail / update / delete
-- `GET|POST /users/:id/companies` — list / assign companies
-- `DELETE /users/:id/companies/:companyId` — remove assignment
-- `GET /dashboard/stats` — aggregated counts by role and country
-
-### Projects & Time Tracking (Task 2)
-- `GET|POST /projects` — list (role-filtered) / create
-- `GET|PATCH|DELETE /projects/:id` — detail / update / delete
-- `GET|POST /projects/:id/assignments` — list team members / add
-- `DELETE /projects/:id/assignments/:userId` — remove team member
-- `GET /projects/:id/billing-summary?month=YYYY-MM` — hours/allocation summary
-- `GET|POST /projects/:id/deliverables` — Kanban items
-- `PATCH|DELETE /projects/:id/deliverables/:deliverableId` — update / delete deliverable
-- `GET|POST /projects/:id/milestones` — milestones
-- `PATCH|DELETE /projects/:id/milestones/:milestoneId` — update / delete milestone
-- `GET|POST /projects/:id/time-entries` — time entries per project
-- `PATCH|DELETE /projects/:id/time-entries/:entryId` — update / delete entry
-- `GET /time-entries` — all time entries for current user (or all if admin/accountant)
-- `GET|POST /todos` — list (role-filtered) / create
-- `PATCH|DELETE /todos/:id` — update / delete todo
-
-### Messages, Notifications & Compliance (Task 4)
-- `GET /projects/:id/thread` — get or auto-create message thread for a project
-- `POST /projects/:id/messages` — send a message (notifies project participants)
-- `PATCH /projects/:id/messages/:messageId/read` — mark message as read
-- `GET /notifications` — list notifications for current user
-- `PATCH /notifications/read-all` — mark all notifications read
-- `PATCH /notifications/:id/read` — mark one notification read
-- `DELETE /notifications/:id` — delete a notification
-- `GET /compliance` — list compliance items (filterable by regime, companyId, year)
-- `POST /compliance` — create a compliance item
-- `PATCH /compliance/:id` — update status/notes/filedAt
-- `DELETE /compliance/:id` — delete item (admin only)
-- `POST /compliance/seed` — seed Germany or India checklist for a company/year
-- `GET /dashboard/admin-stats` — financial overview (pending/overdue invoices, open offers, hours, compliance)
-
-### Offers, Contracts & Invoices (Task 3)
-- `GET|POST /offers` — list / create offers
-- `GET|PATCH|DELETE /offers/:id` — detail / update / delete
-- `POST /offers/:id/convert-to-contract` — convert accepted offer to contract
-- `GET|POST /contracts` — list / create contracts
-- `GET|PATCH|DELETE /contracts/:id` — detail / update / delete
-- `GET|POST /contract-templates` — list / create contract templates
-- `GET|PATCH|DELETE /contract-templates/:id` — detail / update / delete
-- `GET|POST /invoices` — list / create invoices (auto-calculates tax by company taxRegime)
-- `GET|PATCH|DELETE /invoices/:id` — detail / update / delete
-- `GET /invoices/export/datev` — DATEV CSV export (admin/germany_accountant only)
-- `GET /invoices/export/tally?format=xml|csv` — Tally export (admin/india_accountant only)
-
-## Frontend Pages
-
-- `/` → redirects to `/dashboard`
-- `/sign-in` — Clerk sign-in
-- `/sign-up` — Clerk sign-up
-- `/dashboard` — stats overview (companies, users by role, by country)
-- `/companies` — list of all 4 entities with tax regime badges
-- `/companies/:id` — detail + inline edit form + delete
-- `/users` — searchable user table with role badges
-- `/users/:id` — user detail + edit + company assignment management
-- `/settings` — current user profile + sign out
-- `/projects` — project list (role-filtered), create/edit, 4 types
-- `/projects/:id` — tabbed detail: Overview, Deliverables (Kanban), Milestones, Time Entries, Billing Cycle
-- `/time-tracking` — personal time log; admins/accountants see all entries
-- `/todos` — task list with priority, due date, toggle done; role-filtered
-- `/client-portal` — client tabbed view: Projects (with deliverable progress), Invoices, Offers, Contracts, Messages (per-project thread)
-- `/freelancer-portal` — freelancer tabbed view: Time Log, Projects, Contracts, Invoices, Messages (per-project thread)
-- `/documents` — Document Centre: unified cross-entity view of all offers, contracts, and invoices with filtering by type/company/project/client
-- `/offers` — offer builder; create/send/accept offers with line items and PDF export; offer→contract conversion
-- `/contracts` — contract management; create from offer or scratch, sign/execute, PDF export; contract templates
-- `/invoices` — multi-entity invoice management with German VAT (19%) and Indian GST (CGST+SGST/IGST/none based on intra/inter-state auto-detection); DATEV CSV export (admin/germany_accountant), Tally XML/CSV export (admin/india_accountant); recurring invoice scheduler (auto-clones every 6h)
-- `/communication-hub` — per-project message threads; all roles (admin, PM, accountant, client, freelancer) can read and send; auto-creates thread on first access; sends notifications to project participants
-- `/compliance` — tax compliance checklist for Germany (quarterly VAT + annual Körperschaftsteuer + Gewerbesteuer) and India (monthly GSTR-3B + quarterly GSTR-1); seed by company/regime/year; toggle filed status; admin/accountant only
-
-## Auth Notes
-
-- Clerk dev keys used in development; live keys auto-swapped on deploy
-- `ApiTokenBridge` component passes Clerk JWT to all API calls via `setAuthTokenGetter`
-- `ClerkProviderWithRouter` wraps inside `WouterRouter` so `useLocation` works correctly
-- `PrivateRoute` uses `useAuth().isSignedIn` (not `SignedIn`/`SignedOut` components — not exported in @clerk/react v6)
-
-## RBAC (Role-Based Access Control)
-
-### Server-side (`artifacts/api-server/src/middlewares/requireRole.ts`)
-- `requireAuth` — any authenticated Clerk user
-- `requireReader` — admin, germany_accountant, india_accountant, project_manager
-- `requireAdmin` — admin only
-- `loadDbUser` — loads `req.dbUser` from DB by Clerk userId (returns 403 if user not in platform)
-
-Applied to routes:
-- GET /companies, /companies/:id, /dashboard/stats → `requireReader`
-- POST/PATCH/DELETE /companies → `requireAdmin`
-- GET /users → `requireAdmin`
-- POST /users (self-register), GET /users/me → `requireAuth`
-- GET/PATCH/DELETE /users/:id → admin or self only
-- GET/POST/DELETE /users/:id/companies → admin or self only
-
-### Frontend (`artifacts/mgmt/src/App.tsx`)
-- `PrivateRoute` accepts `allowedRoles?: UserRole[]`; fetches `useGetMe()` and redirects non-permitted roles to /dashboard
-- /users, /users/:id → admin only
-- /dashboard, /companies, /companies/:id → staff roles (admin + accountants + project_manager)
-- /settings → all roles
-
-### Sidebar (`artifacts/mgmt/src/components/layout/Sidebar.tsx`)
-- Calls `useGetMe()` and filters navigation items by the user's role
-- Shows user name, email, role label, and sign-out button at the bottom
-
-## Seed Script
+## Database setup
 
 ```bash
-pnpm --filter @workspace/db run seed
+pnpm migrate            # apply pending migrations
+pnpm db:seed            # seed companies + dev test accounts (idempotent)
 ```
-Creates the 4 company entities if they don't already exist (idempotent via `onConflictDoNothing`).
 
-## Codegen Notes
+To add a new schema change:
+
+```bash
+# 1. Edit a file under lib/db/src/schema/
+# 2. Generate the SQL
+pnpm db:generate -- --name add_my_column
+# 3. Review the generated SQL under lib/db/drizzle/, commit, then apply
+pnpm migrate
+```
+
+The post-merge hook (`scripts/post-merge.sh`) runs `pnpm migrate`
+automatically after every merge, so the deployed DB stays in sync.
+
+> **Don't run `drizzle-kit push`.** It's not in any script and shouldn't
+> be added back — see [memory.md → Database & migrations](./memory.md#database--migrations)
+> for the rationale.
+
+## Codegen
 
 After changing `lib/api-spec/openapi.yaml`:
-1. Run `pnpm --filter @workspace/api-spec run codegen`
-2. Verify `lib/api-zod/src/index.ts` exports `export * from "./generated/api";` only (no stale refs)
-3. Run `pnpm run typecheck` to confirm clean build
+
+```bash
+pnpm --filter @workspace/api-spec run codegen
+pnpm run typecheck
+```
+
+`lib/api-zod/src/index.ts` should only re-export `./generated/api`. Any
+hand-written exports there will drift.
+
+## Deployment
+
+- **Target**: Autoscale (`.replit` → `[deployment]`).
+- **Post-build**: `pnpm store prune` (frees disk for the deploy image).
+- **Post-merge**: `scripts/post-merge.sh` → `pnpm install --frozen-lockfile`
+  + `pnpm migrate`.
+- **Clerk keys**: dev key in `.replit`, live key auto-swapped via Replit
+  Secrets at deploy time.
+
+## Troubleshooting on Replit
+
+- **Preview pane is blank** — check the workflow is running and not
+  crash-looping (Workflows panel → console). The most common cause is a
+  hard-coded port; the dev server must read `$PORT`.
+- **CORS / iframe errors in mgmt** — Vite must allow all hosts. The
+  `mgmt` `vite.config.ts` already sets `server.allowedHosts: true`.
+- **Clerk dev keys "not authorised for this domain"** — open the Clerk
+  Dashboard → Domains → add your `replit.dev` URL.
+- **`DATABASE_URL must be set`** — re-provision the Postgres module from
+  the database tool, or check `.env`.
+- **`pnpm migrate` errors with "table already exists"** — the DB was
+  bootstrapped via the legacy `push` flow, so the
+  `drizzle.__drizzle_migrations` table is missing the baseline hash. See
+  [memory.md → Database & migrations](./memory.md#database--migrations)
+  for the bootstrap snippet.
+- **"Sign-in succeeded but I see nothing"** — your Clerk user has no
+  `users` row. Sign up with one of the `@stwv-dev.com` test emails (see
+  [TESTING.md](./TESTING.md)) or set `PLATFORM_ADMIN_EMAILS` to your
+  email and re-sign-in.
+- **Recurring invoice clones missing** — the scheduler runs every 6h
+  inside the api-server process. After a long idle period, restart the
+  API Server workflow to kick the loop.
+
+## Reference: data model & API surface
+
+The full schema, route list, and page→role matrix have moved to
+[design.md](./design.md). Quick pointers:
+
+- **23 tables** under `lib/db/src/schema/` (one file per table).
+- **API routes** mounted under `/api/*` from
+  `artifacts/api-server/src/routes/index.ts`.
+- **Frontend pages** registered in `artifacts/mgmt/src/App.tsx`.
+
+If you only need a list of seeded entities or test accounts, see
+[TESTING.md](./TESTING.md).
