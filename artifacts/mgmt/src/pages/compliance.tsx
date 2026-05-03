@@ -31,7 +31,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
 import { CheckCircle2, Clock, AlertCircle, Plus, RefreshCw, Shield, FileBarChart, Download, FileText, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { generateTaxSummaryPdf } from "@/lib/pdf-generator";
 
@@ -234,6 +233,36 @@ function getPreviousPeriod(item: ComplianceItem): { periodStart: string; periodE
   return null; // annual — no comparison
 }
 
+/** Compute the same period in the prior year (year-1). Works for monthly, quarterly, and annual items. */
+function getYoYPeriod(item: ComplianceItem): { periodStart: string; periodEnd: string } | null {
+  const { year, quarter, month } = item;
+  if (!year) return null;
+  const py = year - 1;
+
+  if (month != null) {
+    const m = String(month).padStart(2, "0");
+    const lastDay = new Date(py, month, 0).getDate();
+    return { periodStart: `${py}-${m}-01`, periodEnd: `${py}-${m}-${lastDay}` };
+  }
+
+  if (quarter != null) {
+    const ranges: Record<number, [string, string]> = {
+      1: [`${py}-01-01`, `${py}-03-31`],
+      2: [`${py}-04-01`, `${py}-06-30`],
+      3: [`${py}-07-01`, `${py}-09-30`],
+      4: [`${py}-10-01`, `${py}-12-31`],
+    };
+    const r = ranges[quarter];
+    if (!r) return null;
+    return { periodStart: r[0], periodEnd: r[1] };
+  }
+
+  // Annual — full prior calendar year
+  return { periodStart: `${py}-01-01`, periodEnd: `${py}-12-31` };
+}
+
+type CompareMode = "off" | "prev" | "yoy";
+
 /** Returns delta info or null if previous is unavailable. */
 function computeDelta(current: number, previous: number | null | undefined): { pct: number; dir: "up" | "down" | "flat" } | null {
   if (previous === null || previous === undefined) return null;
@@ -268,11 +297,20 @@ function DeltaBadge({ delta, neutral = false }: { delta: { pct: number; dir: "up
 
 function TaxReportModal({ item }: { item: ComplianceItem }) {
   const [open, setOpen] = useState(false);
-  const [compare, setCompare] = useState(false);
+  const [compareMode, setCompareMode] = useState<CompareMode>("off");
   const period = getPeriod(item);
-  const prevPeriod = getPreviousPeriod(item);
-  const canCompare = !!prevPeriod;
-  const useCompare = compare && canCompare;
+  const prevPeriodOpt = getPreviousPeriod(item);
+  const yoyPeriodOpt = getYoYPeriod(item);
+  const canPrev = !!prevPeriodOpt;
+  const canYoY = !!yoyPeriodOpt;
+  const canCompare = canPrev || canYoY;
+
+  // Resolve the active comparison range based on the selected mode.
+  const activePrev =
+    compareMode === "prev" ? prevPeriodOpt :
+    compareMode === "yoy" ? yoyPeriodOpt :
+    null;
+  const useCompare = !!activePrev;
 
   const { data: report, isLoading, isError } = useGetTaxSummary(
     {
@@ -280,7 +318,7 @@ function TaxReportModal({ item }: { item: ComplianceItem }) {
       regime: item.regime as GetTaxSummaryRegime,
       periodStart: period?.periodStart ?? "",
       periodEnd: period?.periodEnd ?? "",
-      ...(useCompare && prevPeriod ? { prevPeriodStart: prevPeriod.periodStart, prevPeriodEnd: prevPeriod.periodEnd } : {}),
+      ...(useCompare && activePrev ? { prevPeriodStart: activePrev.periodStart, prevPeriodEnd: activePrev.periodEnd } : {}),
     },
     {
       query: {
@@ -291,12 +329,18 @@ function TaxReportModal({ item }: { item: ComplianceItem }) {
           item.regime,
           period?.periodStart,
           period?.periodEnd,
-          useCompare ? prevPeriod?.periodStart : null,
-          useCompare ? prevPeriod?.periodEnd : null,
+          compareMode,
+          useCompare ? activePrev?.periodStart : null,
+          useCompare ? activePrev?.periodEnd : null,
         ],
       },
     },
   );
+
+  const compareLabel =
+    compareMode === "prev" ? "previous period" :
+    compareMode === "yoy" ? "same period last year" :
+    "previous period";
 
   if (!period) return null;
 
@@ -330,23 +374,52 @@ function TaxReportModal({ item }: { item: ComplianceItem }) {
           <p className="text-sm text-slate-500">Cannot determine period for this item.</p>
         )}
 
-        {/* Period-over-period comparison toggle */}
-        {canCompare && prevPeriod && (
-          <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-            <div>
-              <label htmlFor={`compare-toggle-${item.id}`} className="text-sm font-medium text-slate-700 cursor-pointer">
-                Compare to previous period
-              </label>
-              <p className="text-xs text-slate-400">
-                {prevPeriod.periodStart} → {prevPeriod.periodEnd}
+        {/* Comparison mode selector — segmented control with Off / Previous / YoY */}
+        {canCompare && (
+          <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-slate-700">Compare to</div>
+              <p className="text-xs text-slate-400 truncate">
+                {activePrev
+                  ? <>vs {compareLabel}: {activePrev.periodStart} → {activePrev.periodEnd}</>
+                  : "Show only the current period"}
               </p>
             </div>
-            <Switch
-              id={`compare-toggle-${item.id}`}
-              checked={compare}
-              onCheckedChange={setCompare}
-              data-testid={`switch-compare-prev-${item.id}`}
-            />
+            <div
+              role="radiogroup"
+              aria-label="Comparison mode"
+              className="inline-flex rounded-md border border-slate-300 bg-white p-0.5 shrink-0"
+              data-testid={`compare-mode-${item.id}`}
+            >
+              {([
+                { val: "off" as const, label: "Off", enabled: true },
+                { val: "prev" as const, label: "Previous period", enabled: canPrev },
+                { val: "yoy" as const, label: "Last year", enabled: canYoY },
+              ]).map(opt => {
+                const active = compareMode === opt.val;
+                return (
+                  <button
+                    key={opt.val}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    disabled={!opt.enabled}
+                    onClick={() => opt.enabled && setCompareMode(opt.val)}
+                    title={opt.enabled ? undefined : "Not available for this filing period"}
+                    className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                      active
+                        ? "bg-slate-900 text-white"
+                        : opt.enabled
+                          ? "text-slate-600 hover:bg-slate-100"
+                          : "text-slate-300 cursor-not-allowed"
+                    }`}
+                    data-testid={`compare-mode-${opt.val}-${item.id}`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
