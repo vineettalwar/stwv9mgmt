@@ -21,8 +21,15 @@ import reportsRouter from "./reports";
 import expensesRouter from "./expenses";
 import calendarRouter from "./calendar";
 import resourcesRouter from "./resources";
+import devRouter from "./dev";
 
 const router: IRouter = Router();
+
+// Dev-only routes (404 in production — see routes/dev.ts).
+// IMPORTANT: must be mounted at the `/dev` prefix so the production 404
+// gate inside `devRouter` only fires for `/api/dev/*` requests, not every
+// `/api/*` request.
+router.use("/dev", devRouter);
 
 router.use(healthRouter);
 router.use(companiesRouter);
