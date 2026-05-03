@@ -11,6 +11,16 @@ export type TaxSummaryBandData = {
   igst?: string | null;
 };
 
+export type TaxSummaryPeriodData = {
+  periodStart: string;
+  periodEnd: string;
+  invoiceCount: number;
+  totalGross: string;
+  totalNet: string;
+  totalTax: string;
+  breakdown: TaxSummaryBandData[];
+};
+
 export type TaxSummaryReportData = {
   companyId: number;
   companyName: string;
@@ -23,6 +33,7 @@ export type TaxSummaryReportData = {
   totalNet: string;
   totalTax: string;
   breakdown: TaxSummaryBandData[];
+  previousPeriod?: TaxSummaryPeriodData | null;
 };
 
 type LineItem = {
@@ -156,44 +167,128 @@ function openPrintWindow(html: string, title: string) {
   win.document.close();
 }
 
+/** Render a small "prev: X (▲X.X%)" sub-line for a numeric cell when previousPeriod is present. Returns "" when no prev. */
+function pdfDeltaSub(curStr: string | number, prevStr: string | number | null | undefined, currency?: string): string {
+  if (prevStr === null || prevStr === undefined || prevStr === "") return "";
+  const cur = typeof curStr === "number" ? curStr : parseFloat(String(curStr));
+  const prev = typeof prevStr === "number" ? prevStr : parseFloat(String(prevStr));
+  if (Number.isNaN(cur) || Number.isNaN(prev)) return "";
+  const prevDisplay = currency ? `${esc(currency)} ${prev.toFixed(2)}` : esc(prev);
+  let arrow = "";
+  let color = "#94a3b8";
+  let pctTxt = "0.0%";
+  if (prev === 0 && cur === 0) {
+    arrow = "—";
+  } else if (prev === 0) {
+    arrow = "▲";
+    color = "#059669";
+    pctTxt = "100.0%";
+  } else {
+    const change = ((cur - prev) / Math.abs(prev)) * 100;
+    if (Math.abs(change) < 0.05) {
+      arrow = "—";
+    } else if (change > 0) {
+      arrow = "▲";
+      color = "#059669";
+      pctTxt = `${change.toFixed(1)}%`;
+    } else {
+      arrow = "▼";
+      color = "#dc2626";
+      pctTxt = `${Math.abs(change).toFixed(1)}%`;
+    }
+  }
+  return `<div style="font-size:10px;color:#94a3b8;margin-top:2px">prev: ${prevDisplay} <span style="color:${color};font-weight:600">${arrow} ${pctTxt}</span></div>`;
+}
+
 export function generateTaxSummaryPdf(report: TaxSummaryReportData) {
   const isGermany = report.regime === "germany";
   const regimeLabel = isGermany ? "Germany — VAT Voranmeldung Summary" : "India — GSTR-3B Summary";
   const cur = esc(report.currency);
+  const prev = report.previousPeriod ?? null;
+  const withPrev = !!prev;
 
-  const bandRows = report.breakdown.map(b => {
+  // Build prev-row lookup
+  const prevByKey = new Map<string, TaxSummaryBandData>();
+  if (prev) for (const b of prev.breakdown) prevByKey.set(`${b.taxType}|${b.taxRate}`, b);
+
+  // Combine current rows + prev-only rows
+  type Row = { cur: TaxSummaryBandData | null; prv: TaxSummaryBandData | null; label: string };
+  const allRows: Row[] = report.breakdown.map(b => ({
+    cur: b, prv: prevByKey.get(`${b.taxType}|${b.taxRate}`) ?? null, label: b.label,
+  }));
+  if (prev) {
+    for (const pb of prev.breakdown) {
+      if (!report.breakdown.some(b => b.taxType === pb.taxType && b.taxRate === pb.taxRate)) {
+        allRows.push({ cur: null, prv: pb, label: `${pb.label} (prev only)` });
+      }
+    }
+  }
+
+  const renderAmt = (val: string | null | undefined, prevVal: string | null | undefined, withCur: boolean): string => {
+    const main = val != null && val !== "" ? `${cur} ${fmt(val)}` : "—";
+    if (!withPrev) return main;
+    return `${main}${pdfDeltaSub(val ?? 0, prevVal ?? (withCur ? 0 : ""), report.currency)}`;
+  };
+  const renderCount = (val: number | null | undefined, prevVal: number | null | undefined): string => {
+    const main = val != null ? esc(val) : "0";
+    if (!withPrev) return main;
+    return `${main}${pdfDeltaSub(val ?? 0, prevVal ?? 0)}`;
+  };
+
+  const bandRows = allRows.map(({ cur: b, prv: pb, label }) => {
+    const inv = b?.invoiceCount ?? 0;
     if (isGermany) {
       return `
-        <tr>
-          <td>${esc(b.label)}</td>
-          <td style="text-align:right">${esc(b.invoiceCount)}</td>
-          <td style="text-align:right">${cur} ${fmt(b.netAmount)}</td>
-          <td style="text-align:right">${cur} ${fmt(b.taxAmount)}</td>
-          <td style="text-align:right">${cur} ${fmt(b.grossAmount)}</td>
+        <tr${b ? "" : ' style="background:#f8fafc;font-style:italic;color:#64748b"'}>
+          <td>${esc(label)}</td>
+          <td style="text-align:right;vertical-align:top">${renderCount(inv, pb?.invoiceCount)}</td>
+          <td style="text-align:right;vertical-align:top">${renderAmt(b?.netAmount ?? null, pb?.netAmount, !!b)}</td>
+          <td style="text-align:right;vertical-align:top">${renderAmt(b?.taxAmount ?? null, pb?.taxAmount, !!b)}</td>
+          <td style="text-align:right;vertical-align:top">${renderAmt(b?.grossAmount ?? null, pb?.grossAmount, !!b)}</td>
         </tr>`;
     }
     return `
-      <tr>
-        <td>${esc(b.label)}</td>
-        <td style="text-align:right">${esc(b.invoiceCount)}</td>
-        <td style="text-align:right">${cur} ${fmt(b.netAmount)}</td>
-        <td style="text-align:right">${b.cgst ? `${cur} ${fmt(b.cgst)}` : "—"}</td>
-        <td style="text-align:right">${b.sgst ? `${cur} ${fmt(b.sgst)}` : "—"}</td>
-        <td style="text-align:right">${b.igst ? `${cur} ${fmt(b.igst)}` : "—"}</td>
-        <td style="text-align:right">${cur} ${fmt(b.taxAmount)}</td>
-        <td style="text-align:right">${cur} ${fmt(b.grossAmount)}</td>
+      <tr${b ? "" : ' style="background:#f8fafc;font-style:italic;color:#64748b"'}>
+        <td>${esc(label)}</td>
+        <td style="text-align:right;vertical-align:top">${renderCount(inv, pb?.invoiceCount)}</td>
+        <td style="text-align:right;vertical-align:top">${renderAmt(b?.netAmount ?? null, pb?.netAmount, !!b)}</td>
+        <td style="text-align:right;vertical-align:top">${b?.cgst ? renderAmt(b.cgst, pb?.cgst, true) : (pb?.cgst && withPrev ? renderAmt(null, pb.cgst, false) : "—")}</td>
+        <td style="text-align:right;vertical-align:top">${b?.sgst ? renderAmt(b.sgst, pb?.sgst, true) : (pb?.sgst && withPrev ? renderAmt(null, pb.sgst, false) : "—")}</td>
+        <td style="text-align:right;vertical-align:top">${b?.igst ? renderAmt(b.igst, pb?.igst, true) : (pb?.igst && withPrev ? renderAmt(null, pb.igst, false) : "—")}</td>
+        <td style="text-align:right;vertical-align:top">${renderAmt(b?.taxAmount ?? null, pb?.taxAmount, !!b)}</td>
+        <td style="text-align:right;vertical-align:top">${renderAmt(b?.grossAmount ?? null, pb?.grossAmount, !!b)}</td>
       </tr>`;
   }).join("");
 
   const tableHead = isGermany
-    ? `<tr><th>Rate Band</th><th style="text-align:right">Invoices</th><th style="text-align:right">Net (Excl. Tax)</th><th style="text-align:right">Tax Collected</th><th style="text-align:right">Gross Total</th></tr>`
-    : `<tr><th>GST Component</th><th style="text-align:right">Invoices</th><th style="text-align:right">Taxable Value</th><th style="text-align:right">CGST</th><th style="text-align:right">SGST</th><th style="text-align:right">IGST</th><th style="text-align:right">Tax Total</th><th style="text-align:right">Gross Total</th></tr>`;
+    ? `<tr><th>Rate Band</th><th style="text-align:right">Invoices${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">Net (Excl. Tax)${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">Tax Collected${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">Gross Total${withPrev ? " (vs prev)" : ""}</th></tr>`
+    : `<tr><th>GST Component</th><th style="text-align:right">Invoices${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">Taxable${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">CGST${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">SGST${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">IGST${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">Tax Total${withPrev ? " (vs prev)" : ""}</th><th style="text-align:right">Gross Total${withPrev ? " (vs prev)" : ""}</th></tr>`;
+
+  const comparisonBlock = withPrev && prev
+    ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:10px 14px;margin-top:8px;font-size:12px;color:#1e40af">
+        <strong>Comparison:</strong> Current period <strong>${esc(report.periodStart)} → ${esc(report.periodEnd)}</strong>
+        vs prior <strong>${esc(prev.periodStart)} → ${esc(prev.periodEnd)}</strong>.
+        Each value cell shows the prior figure and percentage change.
+      </div>`
+    : "";
+
+  const totalsBlock = withPrev && prev
+    ? `<div class="totals" style="margin-top:24px">
+        <div class="totals-row"><span>Total Taxable (Net)</span><span>${cur} ${fmt(report.totalNet)} <span style="font-size:11px;color:#94a3b8">(prev: ${cur} ${fmt(prev.totalNet)} ${pdfDeltaSubInline(report.totalNet, prev.totalNet)})</span></span></div>
+        <div class="totals-row"><span>Total Tax Collected</span><span>${cur} ${fmt(report.totalTax)} <span style="font-size:11px;color:#94a3b8">(prev: ${cur} ${fmt(prev.totalTax)} ${pdfDeltaSubInline(report.totalTax, prev.totalTax)})</span></span></div>
+        <div class="totals-total"><span>Total Gross Revenue</span><span>${cur} ${fmt(report.totalGross)} <span style="font-size:11px;color:#94a3b8;font-weight:400">(prev: ${cur} ${fmt(prev.totalGross)} ${pdfDeltaSubInline(report.totalGross, prev.totalGross)})</span></span></div>
+      </div>`
+    : `<div class="totals" style="margin-top:24px">
+        <div class="totals-row"><span>Total Taxable (Net)</span><span>${cur} ${fmt(report.totalNet)}</span></div>
+        <div class="totals-row"><span>Total Tax Collected</span><span>${cur} ${fmt(report.totalTax)}</span></div>
+        <div class="totals-total"><span>Total Gross Revenue</span><span>${cur} ${fmt(report.totalGross)}</span></div>
+      </div>`;
 
   const html = `
     <div class="header">
       <div>
         <h1>${esc(regimeLabel)}</h1>
-        <div class="doc-number">Period: ${esc(report.periodStart)} to ${esc(report.periodEnd)}</div>
+        <div class="doc-number">Period: ${esc(report.periodStart)} to ${esc(report.periodEnd)}${withPrev && prev ? ` &nbsp;·&nbsp; vs prior ${esc(prev.periodStart)} to ${esc(prev.periodEnd)}` : ""}</div>
       </div>
       <div style="text-align:right">
         <div style="color:#64748b;font-size:12px;margin-top:4px">Generated: ${new Date().toLocaleDateString()}</div>
@@ -212,6 +307,8 @@ export function generateTaxSummaryPdf(report: TaxSummaryReportData) {
       </div>
     </div>
 
+    ${comparisonBlock}
+
     <hr class="divider">
 
     <div class="section">
@@ -222,11 +319,7 @@ export function generateTaxSummaryPdf(report: TaxSummaryReportData) {
       </table>
     </div>
 
-    <div class="totals" style="margin-top:24px">
-      <div class="totals-row"><span>Total Taxable (Net)</span><span>${cur} ${fmt(report.totalNet)}</span></div>
-      <div class="totals-row"><span>Total Tax Collected</span><span>${cur} ${fmt(report.totalTax)}</span></div>
-      <div class="totals-total"><span>Total Gross Revenue</span><span>${cur} ${fmt(report.totalGross)}</span></div>
-    </div>
+    ${totalsBlock}
 
     ${isGermany ? `
     <br>
@@ -241,7 +334,22 @@ export function generateTaxSummaryPdf(report: TaxSummaryReportData) {
     </div>`}
   `;
 
-  openPrintWindow(html, `${regimeLabel} — ${report.periodStart} to ${report.periodEnd}`);
+  const titleSuffix = withPrev ? " (vs prior period)" : "";
+  openPrintWindow(html, `${regimeLabel} — ${report.periodStart} to ${report.periodEnd}${titleSuffix}`);
+}
+
+/** Inline (no leading "prev:") delta arrow + pct fragment for use inside totals rows. */
+function pdfDeltaSubInline(curStr: string | number, prevStr: string | number): string {
+  const cur = typeof curStr === "number" ? curStr : parseFloat(String(curStr));
+  const prev = typeof prevStr === "number" ? prevStr : parseFloat(String(prevStr));
+  if (Number.isNaN(cur) || Number.isNaN(prev)) return "";
+  if (prev === 0 && cur === 0) return `<span style="color:#94a3b8">— 0%</span>`;
+  if (prev === 0) return `<span style="color:#059669;font-weight:600">▲ 100%</span>`;
+  const change = ((cur - prev) / Math.abs(prev)) * 100;
+  if (Math.abs(change) < 0.05) return `<span style="color:#94a3b8">— 0%</span>`;
+  const color = change > 0 ? "#059669" : "#dc2626";
+  const arrow = change > 0 ? "▲" : "▼";
+  return `<span style="color:${color};font-weight:600">${arrow} ${Math.abs(change).toFixed(1)}%</span>`;
 }
 
 export function generateOfferPdf(offer: OfferData) {

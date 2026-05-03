@@ -88,33 +88,116 @@ function csvCell(v: string | number | null | undefined): string {
   return s;
 }
 
+/** Format a numeric delta as a signed % string suitable for CSV/PDF cells. Returns "" when prev is missing. */
+function deltaCell(currentStr: string | number, prevStr: string | number | null | undefined): string {
+  if (prevStr === null || prevStr === undefined || prevStr === "") return "";
+  const cur = typeof currentStr === "number" ? currentStr : parseFloat(String(currentStr));
+  const prev = typeof prevStr === "number" ? prevStr : parseFloat(String(prevStr));
+  if (Number.isNaN(cur) || Number.isNaN(prev)) return "";
+  if (prev === 0 && cur === 0) return "0.0%";
+  if (prev === 0) return "+100.0%";
+  const change = ((cur - prev) / Math.abs(prev)) * 100;
+  const sign = change > 0 ? "+" : "";
+  return `${sign}${change.toFixed(1)}%`;
+}
+
 function downloadTaxSummaryCsv(report: TaxSummaryReport) {
   const isGermany = report.regime === "germany";
-  const header = isGermany
-    ? "Rate Band,Invoices,Net Amount (Excl. Tax),Tax Collected,Gross Amount"
-    : "GST Component,Invoices,Taxable Value,CGST,SGST,IGST,Tax Total,Gross Total";
+  const prev = report.previousPeriod;
+  const withPrev = !!prev;
 
-  const rows = report.breakdown.map(b => {
-    if (isGermany) {
-      return [csvCell(b.label), csvCell(b.invoiceCount), csvCell(b.netAmount), csvCell(b.taxAmount), csvCell(b.grossAmount)].join(",");
+  // Build prev-row lookup for cell-level matching by taxType+taxRate
+  const prevByKey = new Map<string, NonNullable<typeof prev>["breakdown"][number]>();
+  if (prev) for (const b of prev.breakdown) prevByKey.set(`${b.taxType}|${b.taxRate}`, b);
+
+  const header = isGermany
+    ? (withPrev
+      ? "Rate Band,Invoices,Prev Invoices,Δ Invoices,Net Amount,Prev Net,Δ Net,Tax Collected,Prev Tax,Δ Tax,Gross Amount,Prev Gross,Δ Gross"
+      : "Rate Band,Invoices,Net Amount (Excl. Tax),Tax Collected,Gross Amount")
+    : (withPrev
+      ? "GST Component,Invoices,Prev Invoices,Δ Invoices,Taxable,Prev Taxable,Δ Taxable,CGST,Prev CGST,Δ CGST,SGST,Prev SGST,Δ SGST,IGST,Prev IGST,Δ IGST,Tax Total,Prev Tax,Δ Tax,Gross Total,Prev Gross,Δ Gross"
+      : "GST Component,Invoices,Taxable Value,CGST,SGST,IGST,Tax Total,Gross Total");
+
+  // Build row arrays — include all current rows plus any prev-only rows (taxType+rate present in prev but not current)
+  const allRows: Array<{ cur: typeof report.breakdown[number] | null; prv: typeof report.breakdown[number] | null; label: string }> = [];
+  for (const b of report.breakdown) {
+    allRows.push({ cur: b, prv: prevByKey.get(`${b.taxType}|${b.taxRate}`) ?? null, label: b.label });
+  }
+  if (prev) {
+    for (const pb of prev.breakdown) {
+      if (!report.breakdown.some(b => b.taxType === pb.taxType && b.taxRate === pb.taxRate)) {
+        allRows.push({ cur: null, prv: pb, label: `${pb.label} (prev only)` });
+      }
     }
+  }
+
+  const rows = allRows.map(({ cur, prv, label }) => {
+    if (isGermany) {
+      if (!withPrev && cur) {
+        return [csvCell(label), csvCell(cur.invoiceCount), csvCell(cur.netAmount), csvCell(cur.taxAmount), csvCell(cur.grossAmount)].join(",");
+      }
+      const inv = cur?.invoiceCount ?? 0;
+      const net = cur?.netAmount ?? "0";
+      const tax = cur?.taxAmount ?? "0";
+      const gross = cur?.grossAmount ?? "0";
+      return [
+        csvCell(label),
+        csvCell(inv), csvCell(prv?.invoiceCount ?? ""), csvCell(deltaCell(inv, prv?.invoiceCount)),
+        csvCell(net), csvCell(prv?.netAmount ?? ""), csvCell(deltaCell(net, prv?.netAmount)),
+        csvCell(tax), csvCell(prv?.taxAmount ?? ""), csvCell(deltaCell(tax, prv?.taxAmount)),
+        csvCell(gross), csvCell(prv?.grossAmount ?? ""), csvCell(deltaCell(gross, prv?.grossAmount)),
+      ].join(",");
+    }
+    if (!withPrev && cur) {
+      return [
+        csvCell(label), csvCell(cur.invoiceCount), csvCell(cur.netAmount),
+        csvCell(cur.cgst ?? ""), csvCell(cur.sgst ?? ""), csvCell(cur.igst ?? ""),
+        csvCell(cur.taxAmount), csvCell(cur.grossAmount),
+      ].join(",");
+    }
+    const inv = cur?.invoiceCount ?? 0;
+    const net = cur?.netAmount ?? "0";
+    const cgst = cur?.cgst ?? "";
+    const sgst = cur?.sgst ?? "";
+    const igst = cur?.igst ?? "";
+    const tax = cur?.taxAmount ?? "0";
+    const gross = cur?.grossAmount ?? "0";
     return [
-      csvCell(b.label), csvCell(b.invoiceCount), csvCell(b.netAmount),
-      csvCell(b.cgst ?? ""), csvCell(b.sgst ?? ""), csvCell(b.igst ?? ""),
-      csvCell(b.taxAmount), csvCell(b.grossAmount),
+      csvCell(label),
+      csvCell(inv), csvCell(prv?.invoiceCount ?? ""), csvCell(deltaCell(inv, prv?.invoiceCount)),
+      csvCell(net), csvCell(prv?.netAmount ?? ""), csvCell(deltaCell(net, prv?.netAmount)),
+      csvCell(cgst), csvCell(prv?.cgst ?? ""), csvCell(deltaCell(cgst || 0, prv?.cgst)),
+      csvCell(sgst), csvCell(prv?.sgst ?? ""), csvCell(deltaCell(sgst || 0, prv?.sgst)),
+      csvCell(igst), csvCell(prv?.igst ?? ""), csvCell(deltaCell(igst || 0, prv?.igst)),
+      csvCell(tax), csvCell(prv?.taxAmount ?? ""), csvCell(deltaCell(tax, prv?.taxAmount)),
+      csvCell(gross), csvCell(prv?.grossAmount ?? ""), csvCell(deltaCell(gross, prv?.grossAmount)),
     ].join(",");
   });
 
-  const summary = isGermany
-    ? `\n\nTotals,${report.invoiceCount},${report.totalNet},${report.totalTax},${report.totalGross}`
-    : `\n\nTotals,${report.invoiceCount},${report.totalNet},,,,${report.totalTax},${report.totalGross}`;
+  let summary: string;
+  if (isGermany) {
+    summary = withPrev && prev
+      ? `\n\nTotals,${report.invoiceCount},${prev.invoiceCount},${deltaCell(report.invoiceCount, prev.invoiceCount)},${report.totalNet},${prev.totalNet},${deltaCell(report.totalNet, prev.totalNet)},${report.totalTax},${prev.totalTax},${deltaCell(report.totalTax, prev.totalTax)},${report.totalGross},${prev.totalGross},${deltaCell(report.totalGross, prev.totalGross)}`
+      : `\n\nTotals,${report.invoiceCount},${report.totalNet},${report.totalTax},${report.totalGross}`;
+  } else {
+    summary = withPrev && prev
+      ? `\n\nTotals,${report.invoiceCount},${prev.invoiceCount},${deltaCell(report.invoiceCount, prev.invoiceCount)},${report.totalNet},${prev.totalNet},${deltaCell(report.totalNet, prev.totalNet)},,,,,,,,,,${report.totalTax},${prev.totalTax},${deltaCell(report.totalTax, prev.totalTax)},${report.totalGross},${prev.totalGross},${deltaCell(report.totalGross, prev.totalGross)}`
+      : `\n\nTotals,${report.invoiceCount},${report.totalNet},,,,${report.totalTax},${report.totalGross}`;
+  }
 
-  const csv = [header, ...rows].join("\n") + summary;
+  // Prepend a comparison header line so spreadsheets clearly show which periods are involved.
+  const meta = withPrev && prev
+    ? `Period,${report.periodStart} to ${report.periodEnd}\nPrev Period,${prev.periodStart} to ${prev.periodEnd}\n\n`
+    : "";
+
+  const csv = meta + [header, ...rows].join("\n") + summary;
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
+  const safeName = report.companyName.replace(/\s+/g, "-").toLowerCase();
+  const suffix = withPrev ? "-vs-prior" : "";
   a.href = url;
-  a.download = `tax-summary-${report.companyName.replace(/\s+/g, "-").toLowerCase()}-${report.periodStart}-to-${report.periodEnd}.csv`;
+  a.download = `tax-summary-${safeName}-${report.periodStart}-to-${report.periodEnd}${suffix}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
